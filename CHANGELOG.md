@@ -121,6 +121,18 @@
     - Wrap operations in try/except with fallbacks
   - Result: STL generation now completes reliably even with noisy/complex masks
 
+#### Documentation
+- **New README.md**: Comprehensive user guide created
+  - Combined Overview from PROJECT_SUMMARY.md
+  - Integrated SETUP_GUIDE.md instructions
+  - Added visual walkthrough with embedded images:
+    - "TracerTemplate Before.png" - Original template photo
+    - "TracerTemplate Profile.png" - Extracted profile layer
+    - "TracerTemplate Text.png" - Extracted text layer
+    - "TracerTemplate FinishedSTL.png" - Final 3D model (placeholder)
+  - Includes troubleshooting, advanced features, and technical details
+  - Clear step-by-step workflow with screenshots
+
 #### Technical Changes
 - Updated `separate_layers()` to accept 6 independent parameters
 - Profile uses: `profile_tolerance`, `profile_threshold`, `profile_smoothing`

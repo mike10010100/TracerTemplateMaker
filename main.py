@@ -1,0 +1,773 @@
+"""
+TracerTemplateMaker - Main Application
+
+A comprehensive tool for converting tracing template images to SVG and STL formats.
+
+Author: TracerTemplateMaker
+License: Open Source
+"""
+
+import sys
+import os
+from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
+                             QHBoxLayout, QPushButton, QFileDialog, QTabWidget,
+                             QLabel, QMessageBox, QGroupBox, QDoubleSpinBox,
+                             QCheckBox, QProgressBar, QDialog)
+from PyQt6.QtCore import Qt, QThread, pyqtSignal
+from PyQt6.QtGui import QIcon, QCursor, QMouseEvent
+import cv2
+import numpy as np
+
+# Import our modules
+from modules.image_processor import ImageProcessor
+from modules.svg_generator import SVGGenerator
+from modules.stl_generator import STLGenerator
+from modules.ui_components import (ImagePreviewWidget, ControlPanel,
+                                   DimensionInputPanel, ColorPickerPanel)
+
+
+class ProcessingThread(QThread):
+    """
+    Thread for handling heavy processing tasks without freezing UI.
+    """
+    finished = pyqtSignal(object)
+    error = pyqtSignal(str)
+
+    def __init__(self, func, *args, **kwargs):
+        super().__init__()
+        self.func = func
+        self.args = args
+        self.kwargs = kwargs
+
+    def run(self):
+        try:
+            result = self.func(*self.args, **self.kwargs)
+            self.finished.emit(result)
+        except Exception as e:
+            self.error.emit(str(e))
+
+
+class MainWindow(QMainWindow):
+    """
+    Main application window for TracerTemplateMaker.
+    """
+
+    def __init__(self):
+        super().__init__()
+
+        # Initialize processors
+        self.image_processor = ImageProcessor()
+        self.svg_generator = None
+        self.stl_generator = None
+
+        # Current processing state
+        self.current_image_path = None
+        self.processed_image = None
+        self.profile_mask = None
+        self.text_mask = None
+        self.svg_path = None
+
+        # Processing parameters (apply to whole image)
+        self.contrast = 1.0
+        self.brightness = 1.0
+        self.sharpness = 1.0
+        self.blur_kernel = 0
+
+        # Profile layer parameters
+        self.profile_threshold = 200
+        self.profile_tolerance = 30
+        self.profile_smoothing = 5
+
+        # Text layer parameters
+        self.text_threshold = 127
+        self.text_tolerance = 30
+        self.text_detail = 2
+
+        # Colors
+        self.bg_color = (255, 255, 255)    # Background/void color - white (BGR)
+        self.tracer_color = (0, 255, 255)  # Tracer card color - yellow (BGR)
+        self.text_color = (0, 0, 0)        # Text/line color - black (BGR)
+
+        # Eyedropper mode
+        self.eyedropper_active = False
+        self.eyedropper_target = None  # Which color we're picking for
+
+        self.init_ui()
+
+    def init_ui(self):
+        """Initialize the user interface."""
+        self.setWindowTitle("TracerTemplateMaker - Image to SVG/STL Converter")
+        self.setGeometry(100, 100, 1400, 800)
+
+        # Create central widget
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+
+        # Main layout
+        main_layout = QHBoxLayout()
+
+        # Left side: Controls
+        left_panel = self.create_left_panel()
+        main_layout.addWidget(left_panel, stretch=1)
+
+        # Right side: Preview and tabs
+        right_panel = self.create_right_panel()
+        main_layout.addWidget(right_panel, stretch=3)
+
+        central_widget.setLayout(main_layout)
+
+        # Status bar
+        self.statusBar().showMessage("Ready - Load an image to begin")
+
+    def create_left_panel(self) -> QWidget:
+        """Create left control panel."""
+        panel = QWidget()
+        layout = QVBoxLayout()
+
+        # File operations
+        file_group = QGroupBox("File Operations")
+        file_layout = QVBoxLayout()
+
+        load_btn = QPushButton("Open Image (JPG/SVG)")
+        load_btn.clicked.connect(self.load_image)
+        file_layout.addWidget(load_btn)
+
+        file_group.setLayout(file_layout)
+        layout.addWidget(file_group)
+
+        # Dimensions input
+        self.dimension_panel = DimensionInputPanel()
+        self.dimension_panel.dimensions_changed.connect(self.on_dimensions_changed)
+        layout.addWidget(self.dimension_panel)
+
+        # Color picker
+        self.color_panel = ColorPickerPanel()
+        self.color_panel.background_color_changed.connect(self.on_bg_color_changed)
+        self.color_panel.tracer_color_changed.connect(self.on_tracer_color_changed)
+        self.color_panel.text_color_changed.connect(self.on_text_color_changed)
+        self.color_panel.eyedropper_requested.connect(self.activate_eyedropper)
+        layout.addWidget(self.color_panel)
+
+        # Image adjustment controls
+        self.control_panel = ControlPanel()
+        self.control_panel.contrast_changed.connect(self.on_contrast_changed)
+        self.control_panel.brightness_changed.connect(self.on_brightness_changed)
+        self.control_panel.sharpness_changed.connect(self.on_sharpness_changed)
+        self.control_panel.blur_changed.connect(self.on_blur_changed)
+        # Profile layer controls
+        self.control_panel.profile_threshold_changed.connect(self.on_profile_threshold_changed)
+        self.control_panel.profile_tolerance_changed.connect(self.on_profile_tolerance_changed)
+        self.control_panel.profile_smoothing_changed.connect(self.on_profile_smoothing_changed)
+        # Text layer controls
+        self.control_panel.text_threshold_changed.connect(self.on_text_threshold_changed)
+        self.control_panel.text_tolerance_changed.connect(self.on_text_tolerance_changed)
+        self.control_panel.text_detail_changed.connect(self.on_text_detail_changed)
+        layout.addWidget(self.control_panel)
+
+        # Process buttons
+        process_group = QGroupBox("Processing")
+        process_layout = QVBoxLayout()
+
+        process_btn = QPushButton("Process Image")
+        process_btn.clicked.connect(self.process_image)
+        process_layout.addWidget(process_btn)
+
+        svg_btn = QPushButton("Generate SVG")
+        svg_btn.clicked.connect(self.generate_svg)
+        process_layout.addWidget(svg_btn)
+
+        stl_btn = QPushButton("Generate STL")
+        stl_btn.clicked.connect(self.open_stl_window)
+        process_layout.addWidget(stl_btn)
+
+        process_group.setLayout(process_layout)
+        layout.addWidget(process_group)
+
+        layout.addStretch()
+        panel.setLayout(layout)
+        return panel
+
+    def create_right_panel(self) -> QWidget:
+        """Create right preview panel."""
+        panel = QWidget()
+        layout = QVBoxLayout()
+
+        # Tab widget for different views
+        self.tab_widget = QTabWidget()
+
+        # Original image tab
+        self.original_preview = ImagePreviewWidget()
+        self.tab_widget.addTab(self.original_preview, "Original")
+
+        # Processed image tab
+        self.processed_preview = ImagePreviewWidget()
+        self.tab_widget.addTab(self.processed_preview, "Processed")
+
+        # Profile mask tab
+        self.profile_preview = ImagePreviewWidget()
+        self.tab_widget.addTab(self.profile_preview, "Profile Layer")
+
+        # Text mask tab
+        self.text_preview = ImagePreviewWidget()
+        self.tab_widget.addTab(self.text_preview, "Text Layer")
+
+        layout.addWidget(self.tab_widget)
+
+        panel.setLayout(layout)
+        return panel
+
+    def load_image(self):
+        """Load image file."""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Open Image",
+            "",
+            "Image Files (*.jpg *.jpeg *.png *.bmp *.svg);;All Files (*)"
+        )
+
+        if file_path:
+            try:
+                self.current_image_path = file_path
+                image = self.image_processor.load_image(file_path)
+
+                # Display original
+                self.original_preview.set_image(image)
+
+                # Auto-detect dimensions from filename if present
+                self.auto_detect_dimensions(file_path)
+
+                self.statusBar().showMessage(f"Loaded: {os.path.basename(file_path)}")
+
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to load image: {str(e)}")
+
+    def auto_detect_dimensions(self, file_path: str):
+        """
+        Auto-detect dimensions from filename if it contains 'Measure'.
+        For example: 'Template_10x5cm_Measure.jpg'
+        """
+        # This is a placeholder - could be enhanced to parse dimensions from filename
+        pass
+
+    def on_dimensions_changed(self, width_mm: float, height_mm: float):
+        """Handle dimension change."""
+        self.image_processor.set_dimensions(width_mm, height_mm)
+        self.statusBar().showMessage(f"Dimensions set: {width_mm}mm x {height_mm}mm")
+
+    def on_contrast_changed(self, value: float):
+        """Handle contrast change."""
+        self.contrast = value
+        self.update_processed_preview()
+        self.process_image()  # Auto-process on change
+
+    def on_brightness_changed(self, value: float):
+        """Handle brightness change."""
+        self.brightness = value
+        self.update_processed_preview()
+        self.process_image()  # Auto-process on change
+
+    def on_sharpness_changed(self, value: float):
+        """Handle sharpness change."""
+        self.sharpness = value
+        self.update_processed_preview()
+        self.process_image()  # Auto-process on change
+
+    def on_blur_changed(self, value: int):
+        """Handle blur change."""
+        self.blur_kernel = value
+        self.update_processed_preview()
+        self.process_image()  # Auto-process on change
+
+    def on_profile_threshold_changed(self, value: int):
+        """Handle profile threshold change."""
+        self.profile_threshold = value
+        self.process_image()  # Auto-process on change
+
+    def on_text_threshold_changed(self, value: int):
+        """Handle text threshold change."""
+        self.text_threshold = value
+        self.process_image()  # Auto-process on change
+
+    def on_profile_tolerance_changed(self, value: int):
+        """Handle profile color tolerance change."""
+        self.profile_tolerance = value
+        self.process_image()  # Auto-process on change
+
+    def on_profile_smoothing_changed(self, value: int):
+        """Handle profile smoothing change."""
+        self.profile_smoothing = value
+        self.process_image()  # Auto-process on change
+
+    def on_text_tolerance_changed(self, value: int):
+        """Handle text color tolerance change."""
+        self.text_tolerance = value
+        self.process_image()  # Auto-process on change
+
+    def on_text_detail_changed(self, value: int):
+        """Handle text detail level change."""
+        self.text_detail = value
+        self.process_image()  # Auto-process on change
+
+    def on_bg_color_changed(self, color: tuple):
+        """Handle background/void color change."""
+        self.bg_color = color
+        self.process_image()  # Auto-process on color change
+
+    def on_tracer_color_changed(self, color: tuple):
+        """Handle tracer card color change."""
+        self.tracer_color = color
+        self.process_image()  # Auto-process on color change
+
+    def on_text_color_changed(self, color: tuple):
+        """Handle text/line color change."""
+        self.text_color = color
+        self.process_image()  # Auto-process on color change
+
+    def activate_eyedropper(self, target: str):
+        """
+        Activate eyedropper mode to pick a color from the image.
+
+        Args:
+            target: Which color to set ('background', 'tracer', or 'text')
+        """
+        if self.processed_image is None:
+            QMessageBox.warning(self, "Warning", "Please load an image first")
+            return
+
+        self.eyedropper_active = True
+        self.eyedropper_target = target
+        self.original_preview.image_label.setCursor(QCursor(Qt.CursorShape.CrossCursor))
+        self.statusBar().showMessage(f"Click on the image to pick {target} color")
+
+        # Temporarily connect click handler
+        self.original_preview.image_label.mousePressEvent = self.eyedropper_click
+
+    def eyedropper_click(self, event: QMouseEvent):
+        """Handle eyedropper click to pick color from image."""
+        if not self.eyedropper_active:
+            return
+
+        # Use original image for color picking (more accurate)
+        if self.image_processor.original_image is None:
+            return
+
+        # Get click position relative to the label
+        pos = event.pos()
+
+        # Calculate position in original image coordinates
+        zoom = self.original_preview.zoom_level
+        img_x = int(pos.x() / zoom)
+        img_y = int(pos.y() / zoom)
+
+        # Get the actual image being displayed
+        original_img = self.image_processor.original_image
+
+        # Make sure we're within image bounds
+        height, width = original_img.shape[:2]
+        if 0 <= img_x < width and 0 <= img_y < height:
+            # Get color from original image (BGR)
+            if len(original_img.shape) == 3:
+                bgr_color = tuple(int(x) for x in original_img[img_y, img_x])
+            else:
+                # Grayscale - convert to BGR
+                gray_val = int(original_img[img_y, img_x])
+                bgr_color = (gray_val, gray_val, gray_val)
+
+            # Set the color
+            self.color_panel.set_color_from_pick(self.eyedropper_target, bgr_color)
+
+            self.statusBar().showMessage(f"Picked color: BGR{bgr_color} at ({img_x}, {img_y})")
+        else:
+            self.statusBar().showMessage(f"Click outside image bounds: ({img_x}, {img_y})")
+
+        # Deactivate eyedropper
+        self.eyedropper_active = False
+        self.eyedropper_target = None
+        self.original_preview.image_label.setCursor(QCursor(Qt.CursorShape.ArrowCursor))
+
+        # Restore normal mouse handler
+        self.original_preview.image_label.mousePressEvent = self.original_preview.mouse_press_event
+
+    def update_processed_preview(self):
+        """Update processed image preview with current settings."""
+        if self.image_processor.original_image is None:
+            return
+
+        try:
+            processed = self.image_processor.process_image(
+                contrast=self.contrast,
+                brightness=self.brightness,
+                sharpness=self.sharpness,
+                blur_kernel=self.blur_kernel
+            )
+            self.processed_image = processed
+            self.processed_preview.set_image(processed)
+
+        except Exception as e:
+            self.statusBar().showMessage(f"Error: {str(e)}")
+
+    def process_image(self):
+        """Process image to extract layers."""
+        if self.image_processor.original_image is None:
+            return  # Silently return if no image loaded (for auto-processing)
+
+        try:
+            # Apply adjustments
+            self.update_processed_preview()
+
+            # Separate layers with independent controls for each layer
+            profile_mask, text_mask = self.image_processor.separate_layers(
+                self.processed_image,
+                self.bg_color,       # Background/void color (white)
+                self.tracer_color,   # Tracer card color (yellow)
+                self.text_color,     # Text/line color (black)
+                # Profile layer controls
+                profile_tolerance=self.profile_tolerance,
+                profile_threshold=self.profile_threshold,
+                profile_smoothing=self.profile_smoothing,
+                # Text layer controls
+                text_tolerance=self.text_tolerance,
+                text_threshold=self.text_threshold,
+                text_detail=self.text_detail
+            )
+
+            self.profile_mask = profile_mask
+            self.text_mask = text_mask
+
+            # Display masks
+            # Profile mask: white = holes/voids, black = everything else
+            # Display as-is (no inversion needed with three-color system)
+            self.profile_preview.set_image(cv2.cvtColor(profile_mask, cv2.COLOR_GRAY2BGR))
+            self.text_preview.set_image(cv2.cvtColor(text_mask, cv2.COLOR_GRAY2BGR))
+
+            self.statusBar().showMessage("Image processed - layers separated")
+
+        except Exception as e:
+            self.statusBar().showMessage(f"Processing error: {str(e)}")
+
+    def generate_svg(self):
+        """Generate SVG from processed masks."""
+        if self.profile_mask is None:
+            QMessageBox.warning(self, "Warning", "Please process the image first")
+            return
+
+        # Get dimensions
+        width_mm, height_mm = self.dimension_panel.get_dimensions()
+
+        # Ask for save location
+        save_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save SVG File",
+            "",
+            "SVG Files (*.svg);;All Files (*)"
+        )
+
+        if not save_path:
+            return
+
+        try:
+            # Create SVG generator
+            self.svg_generator = SVGGenerator(width_mm, height_mm)
+
+            # Profile mask has holes as white, card as black
+            # SVG generator expects solid as white, holes as black (same as STL)
+            # Therefore we need to INVERT the profile mask for SVG generation
+            inverted_profile = cv2.bitwise_not(self.profile_mask)
+
+            self.svg_path = self.svg_generator.create_layered_svg(
+                inverted_profile,  # Inverted: solid card is white, holes are black
+                self.text_mask,
+                save_path,
+                include_metadata=True
+            )
+
+            QMessageBox.information(self, "Success", f"SVG saved to:\n{save_path}")
+            self.statusBar().showMessage(f"SVG generated: {os.path.basename(save_path)}")
+
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"SVG generation failed: {str(e)}")
+
+    def open_stl_window(self):
+        """Open STL generation window."""
+        if self.profile_mask is None:
+            QMessageBox.warning(self, "Warning", "Please process the image first")
+            return
+
+        # Create STL dialog
+        dialog = STLGeneratorDialog(self, self.profile_mask, self.text_mask,
+                                   self.dimension_panel.get_dimensions())
+        dialog.exec()
+
+
+class STLGeneratorDialog(QDialog):
+    """
+    Dialog for STL generation with preview.
+    """
+
+    def __init__(self, parent, profile_mask, text_mask, dimensions):
+        super().__init__(parent)
+        self.profile_mask = profile_mask
+        self.text_mask = text_mask
+        self.width_mm, self.height_mm = dimensions
+
+        self.init_ui()
+
+    def init_ui(self):
+        """Initialize UI."""
+        self.setWindowTitle("STL Generator")
+        self.setGeometry(200, 200, 1000, 700)
+
+        # Main layout with splitter for preview
+        main_layout = QHBoxLayout()
+
+        # Left side: Controls
+        left_widget = QWidget()
+        left_layout = QVBoxLayout()
+
+        # Title
+        title = QLabel("3D Model Settings")
+        title.setStyleSheet("font-size: 16px; font-weight: bold;")
+        left_layout.addWidget(title)
+
+        # Thickness control
+        thickness_layout = QHBoxLayout()
+        thickness_layout.addWidget(QLabel("Base Thickness (mm):"))
+        self.thickness_input = QDoubleSpinBox()
+        self.thickness_input.setRange(0.5, 10.0)
+        self.thickness_input.setValue(2.0)
+        self.thickness_input.setDecimals(2)
+        self.thickness_input.valueChanged.connect(self.update_preview)
+        thickness_layout.addWidget(self.thickness_input)
+        thickness_layout.addStretch()
+        left_layout.addLayout(thickness_layout)
+
+        # Separate text option
+        self.separate_text_check = QCheckBox("Create raised text layer (for dual-color printing)")
+        self.separate_text_check.setChecked(False)
+        self.separate_text_check.stateChanged.connect(self.update_preview)
+        left_layout.addWidget(self.separate_text_check)
+
+        # Preview button
+        preview_btn = QPushButton("Generate Preview")
+        preview_btn.clicked.connect(self.update_preview)
+        left_layout.addWidget(preview_btn)
+
+        # Generate button
+        generate_btn = QPushButton("Generate and Save STL")
+        generate_btn.clicked.connect(self.generate_stl)
+        left_layout.addWidget(generate_btn)
+
+        # Info label
+        info = QLabel("Note: The STL will maintain dimensional accuracy based on your input dimensions. Click 'Generate Preview' to see a 3D visualization.")
+        info.setStyleSheet("color: #666; font-style: italic;")
+        info.setWordWrap(True)
+        left_layout.addWidget(info)
+
+        left_layout.addStretch()
+        left_widget.setLayout(left_layout)
+        left_widget.setMaximumWidth(400)
+
+        # Right side: Preview
+        right_widget = QWidget()
+        right_layout = QVBoxLayout()
+
+        preview_title = QLabel("3D Preview")
+        preview_title.setStyleSheet("font-size: 14px; font-weight: bold;")
+        right_layout.addWidget(preview_title)
+
+        self.preview_label = QLabel("Click 'Generate Preview' to see 3D model")
+        self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.preview_label.setStyleSheet("border: 2px solid #ccc; background-color: #f5f5f5; min-height: 400px;")
+        right_layout.addWidget(self.preview_label)
+
+        right_widget.setLayout(right_layout)
+
+        # Add both sides to main layout
+        main_layout.addWidget(left_widget)
+        main_layout.addWidget(right_widget, 1)  # Give preview more space
+
+        self.setLayout(main_layout)
+
+        # Store preview mesh for reuse
+        self.preview_mesh = None
+
+    def update_preview(self):
+        """Generate and display 3D preview of the STL."""
+        try:
+            import matplotlib
+            matplotlib.use('Agg')  # Non-interactive backend
+            import matplotlib.pyplot as plt
+            from mpl_toolkits.mplot3d import Axes3D
+            from io import BytesIO
+
+            self.preview_label.setText("Generating preview...")
+            QApplication.processEvents()  # Update UI
+
+            # Create STL generator
+            stl_gen = STLGenerator(self.width_mm, self.height_mm)
+
+            # Prepare masks
+            inverted_profile = cv2.bitwise_not(self.profile_mask)
+            thickness = self.thickness_input.value()
+            separate_text = self.separate_text_check.isChecked()
+
+            # Generate meshes
+            if separate_text and self.text_mask is not None:
+                # Create dual layer
+                text_height = 0.2
+                base_mesh = stl_gen.extrude_mask_to_mesh(inverted_profile, thickness, 0.0)
+                text_mesh = stl_gen.extrude_mask_to_mesh(self.text_mask, text_height, thickness)
+
+                if len(text_mesh.vertices) > 0:
+                    import trimesh
+                    combined_mesh = trimesh.util.concatenate([base_mesh, text_mesh])
+                else:
+                    combined_mesh = base_mesh
+
+                # Apply the same transformation as in create_dual_layer_stl
+                import numpy as np
+                # Mirror flip on Y-axis (same as STL generation)
+                mirror_matrix = np.array([
+                    [1, 0, 0, 0],   # Keep X
+                    [0, 1, 0, 0],   # Keep Y
+                    [0, 0, -1, 0],  # Flip Z
+                    [0, 0, 0, 1]
+                ])
+                combined_mesh.apply_transform(mirror_matrix)
+                min_z = combined_mesh.bounds[0][2]
+                if min_z < 0:
+                    combined_mesh.apply_translation([0, 0, -min_z])
+
+                self.preview_mesh = combined_mesh
+            else:
+                # Simple mesh
+                if self.text_mask is not None:
+                    combined_mask = cv2.bitwise_or(inverted_profile, self.text_mask)
+                else:
+                    combined_mask = inverted_profile
+                self.preview_mesh = stl_gen.extrude_mask_to_mesh(combined_mask, thickness, 0.0)
+
+            # Check if mesh is valid
+            if len(self.preview_mesh.vertices) == 0 or len(self.preview_mesh.faces) == 0:
+                self.preview_label.setText("Preview failed: No geometry generated.\nCheck that your masks have content.")
+                return
+
+            # Render mesh to image
+            fig = plt.figure(figsize=(8, 6))
+            ax = fig.add_subplot(111, projection='3d')
+
+            # Plot the mesh
+            vertices = self.preview_mesh.vertices
+            faces = self.preview_mesh.faces
+
+            # Sample faces for faster rendering (if too many)
+            if len(faces) > 5000:
+                sample_indices = np.random.choice(len(faces), 5000, replace=False)
+                faces = faces[sample_indices]
+
+            # Create 3D surface
+            from matplotlib.tri import Triangulation
+            x, y, z = vertices[:, 0], vertices[:, 1], vertices[:, 2]
+            ax.plot_trisurf(x, y, z, triangles=faces, cmap='viridis',
+                           alpha=0.8, edgecolor='none', shade=True)
+
+            # Set labels and view
+            ax.set_xlabel('X (mm)')
+            ax.set_ylabel('Y (mm)')
+            ax.set_zlabel('Z (mm)')
+            ax.set_title('STL Preview (Text side on top)')
+
+            # Set equal aspect ratio
+            max_range = np.array([vertices[:, 0].max() - vertices[:, 0].min(),
+                                 vertices[:, 1].max() - vertices[:, 1].min(),
+                                 vertices[:, 2].max() - vertices[:, 2].min()]).max() / 2.0
+            mid_x = (vertices[:, 0].max() + vertices[:, 0].min()) * 0.5
+            mid_y = (vertices[:, 1].max() + vertices[:, 1].min()) * 0.5
+            mid_z = (vertices[:, 2].max() + vertices[:, 2].min()) * 0.5
+            ax.set_xlim(mid_x - max_range, mid_x + max_range)
+            ax.set_ylim(mid_y - max_range, mid_y + max_range)
+            ax.set_zlim(mid_z - max_range, mid_z + max_range)
+
+            # View angle - looking down from above and slightly to the side
+            ax.view_init(elev=30, azim=45)
+
+            # Save to buffer
+            buf = BytesIO()
+            plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')
+            buf.seek(0)
+            plt.close(fig)
+
+            # Display in label
+            pixmap = QPixmap()
+            pixmap.loadFromData(buf.read())
+            self.preview_label.setPixmap(pixmap.scaled(
+                self.preview_label.size(),
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation
+            ))
+
+        except ImportError as e:
+            self.preview_label.setText(f"Preview requires matplotlib.\nPlease install: pip install matplotlib>=3.7.0\n\nError: {str(e)}")
+            print(f"Import error in preview: {e}")
+        except Exception as e:
+            self.preview_label.setText(f"Preview generation failed:\n{str(e)}\n\nCheck console for details.")
+            print(f"Preview error: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def generate_stl(self):
+        """Generate STL file."""
+        # Ask for save location
+        save_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save STL File",
+            "",
+            "STL Files (*.stl);;All Files (*)"
+        )
+
+        if not save_path:
+            return
+
+        try:
+            # Create STL generator
+            stl_gen = STLGenerator(self.width_mm, self.height_mm)
+
+            # Profile mask has holes as white, card as black
+            # STL generator expects solid as white, holes as black
+            # Therefore we need to INVERT the profile mask for STL generation
+            inverted_profile = cv2.bitwise_not(self.profile_mask)
+
+            thickness = self.thickness_input.value()
+            separate_text = self.separate_text_check.isChecked()
+
+            stl_path = stl_gen.create_template_stl(
+                inverted_profile,  # Inverted: solid card is white, holes are black
+                self.text_mask,
+                thickness,
+                save_path,
+                separate_text=separate_text
+            )
+
+            QMessageBox.information(self, "Success", f"STL saved to:\n{save_path}")
+            self.close()
+
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"STL generation failed: {str(e)}")
+
+
+def main():
+    """Main application entry point."""
+    app = QApplication(sys.argv)
+
+    # Set application style
+    app.setStyle('Fusion')
+
+    # Create and show main window
+    window = MainWindow()
+    window.show()
+
+    sys.exit(app.exec())
+
+
+if __name__ == "__main__":
+    main()

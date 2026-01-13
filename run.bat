@@ -22,7 +22,7 @@ python -c "import cv2" 2>nul
 if errorlevel 1 (
     echo Installing dependencies...
     pip install --upgrade pip
-    pip install -r requirements.txt
+    pip install -e .
     echo Dependencies installed
 )
 

@@ -20,7 +20,7 @@ source venv/bin/activate
 if ! python -c "import cv2" 2>/dev/null; then
     echo "Installing dependencies..."
     pip install --upgrade pip
-    pip install -r requirements.txt
+    pip install -e .
     echo "✓ Dependencies installed"
 fi
 

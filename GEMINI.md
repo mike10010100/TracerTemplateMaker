@@ -14,17 +14,21 @@ The core value proposition is **dimensional accuracy**, allowing makers to digit
 *   **Image Processing:** OpenCV, Pillow, scikit-image
 *   **Vector/3D Generation:** svgwrite, trimesh, numpy-stl, shapely
 *   **Visualization:** Matplotlib
+*   **Packaging:** setuptools, pyproject.toml
 
 ## Architecture
 
 The project follows a modular architecture:
 
-*   **`main.py`**: The application entry point and main window controller.
+*   **`main.py`**: The application entry point and main window controller. It handles UI setup, event handling, and threading for long-running tasks.
 *   **`modules/`**: Contains core logic separated by concern.
     *   **`image_processor.py`**: Handles image loading, preprocessing (contrast/brightness), edge detection (Canny), and color-based layer separation.
     *   **`svg_generator.py`**: Converts processed contours into SVG paths, managing layers (Profile vs. Text) and scaling.
     *   **`stl_generator.py`**: Extrudes 2D masks into 3D meshes, handling thickness, raised text, and watertight mesh generation.
-    *   **`ui_components.py`**: Custom Reusable PyQt6 widgets (e.g., Zoomable/Pannable Image Views, Control Panels).
+    *   **`ui_components.py`**: Custom Reusable PyQt6 widgets (e.g., Zoomable/Pannable Image Views, Control Panels, NoWheelSlider).
+    *   **`config.py`**: Manages default settings and persistent user configuration.
+    *   **`app_state.py`**: Encapsulates the application's runtime state to decouple logic from the UI.
+    *   **`logger.py`**: Provides structured logging to console and file.
 
 ## Setup & Development
 
@@ -42,6 +46,8 @@ The project follows a modular architecture:
 2.  Install dependencies:
     ```bash
     pip install -r requirements.txt
+    # OR
+    pip install .
     ```
 
 ### Running the Application
@@ -62,3 +68,5 @@ The project follows a modular architecture:
 *   **Documentation:** Functions should have docstrings explaining their purpose.
 *   **Dimensionality:** All geometric operations must account for the pixel-to-millimeter scale factor to ensure accuracy.
 *   **Error Handling:** Use try-except blocks, especially in file I/O and mesh generation, to prevent GUI crashes.
+*   **Logging:** Use the `logger` module instead of `print()` for all status and error reporting.
+*   **Concurrency:** Heavy operations (image processing, STL generation) MUST run in background threads (`ProcessingThread`) to avoid freezing the UI.

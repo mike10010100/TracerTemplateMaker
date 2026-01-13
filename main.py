@@ -826,6 +826,22 @@ class STLGeneratorDialog(QDialog):
 
     def generate_stl(self):
         """Generate STL file."""
+        # Pre-flight check: Warn if too many contours (noise)
+        if self.profile_mask is not None:
+            contours, _ = cv2.findContours(self.profile_mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+            count = len(contours)
+            if count > 1000:
+                msg = (f"Detected {count} shapes/holes in the profile layer.\n\n"
+                       "This usually indicates image noise (tiny specks). "
+                       "Generating this model may take a very long time and produce an unusable file.\n\n"
+                       "Recommended: Cancel and adjust 'Profile Threshold' or 'Blur' to reduce noise.\n\n"
+                       "Do you want to proceed anyway?")
+                reply = QMessageBox.warning(self, "High Complexity Warning", msg,
+                                          QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                                          QMessageBox.StandardButton.No)
+                if reply == QMessageBox.StandardButton.No:
+                    return
+
         # Ask for save location
         save_path, _ = QFileDialog.getSaveFileName(
             self,

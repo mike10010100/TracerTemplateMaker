@@ -23,7 +23,8 @@ from modules.image_processor import ImageProcessor
 from modules.svg_generator import SVGGenerator
 from modules.stl_generator import STLGenerator
 from modules.ui_components import (ImagePreviewWidget, ControlPanel,
-                                   DimensionInputPanel, ColorPickerPanel)
+                                   DimensionInputPanel, ColorPickerPanel,
+                                   NoWheelDoubleSpinBox)
 
 
 class ProcessingThread(QThread):
@@ -587,7 +588,7 @@ class STLGeneratorDialog(QDialog):
         # Thickness control
         thickness_layout = QHBoxLayout()
         thickness_layout.addWidget(QLabel("Base Thickness (mm):"))
-        self.thickness_input = QDoubleSpinBox()
+        self.thickness_input = NoWheelDoubleSpinBox()
         self.thickness_input.setRange(0.5, 10.0)
         self.thickness_input.setValue(2.0)
         self.thickness_input.setDecimals(2)

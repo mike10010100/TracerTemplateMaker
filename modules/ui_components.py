@@ -17,6 +17,24 @@ import numpy as np
 import cv2
 
 
+class NoWheelSlider(QSlider):
+    """QSlider that ignores mouse wheel events to prevent accidental adjustments during scrolling."""
+    def wheelEvent(self, event):
+        event.ignore()
+
+
+class NoWheelSpinBox(QSpinBox):
+    """QSpinBox that ignores mouse wheel events."""
+    def wheelEvent(self, event):
+        event.ignore()
+
+
+class NoWheelDoubleSpinBox(QDoubleSpinBox):
+    """QDoubleSpinBox that ignores mouse wheel events."""
+    def wheelEvent(self, event):
+        event.ignore()
+
+
 class ImagePreviewWidget(QWidget):
     """
     Widget for displaying images with pan and zoom capabilities.
@@ -318,7 +336,7 @@ class ControlPanel(QWidget):
         layout = QHBoxLayout()
 
         # Create slider
-        slider = QSlider(Qt.Orientation.Horizontal)
+        slider = NoWheelSlider(Qt.Orientation.Horizontal)
         slider.setMinimum(min_val)
         slider.setMaximum(max_val)
         slider.setValue(default)
@@ -417,7 +435,7 @@ class DimensionInputPanel(QWidget):
         # Width input
         width_layout = QHBoxLayout()
         width_layout.addWidget(QLabel("Width (mm):"))
-        self.width_input = QDoubleSpinBox()
+        self.width_input = NoWheelDoubleSpinBox()
         self.width_input.setRange(1.0, 1000.0)
         self.width_input.setValue(100.0)
         self.width_input.setDecimals(2)
@@ -428,7 +446,7 @@ class DimensionInputPanel(QWidget):
         # Height input
         height_layout = QHBoxLayout()
         height_layout.addWidget(QLabel("Height (mm):"))
-        self.height_input = QDoubleSpinBox()
+        self.height_input = NoWheelDoubleSpinBox()
         self.height_input.setRange(1.0, 1000.0)
         self.height_input.setValue(50.0)
         self.height_input.setDecimals(2)

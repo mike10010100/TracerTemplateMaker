@@ -188,17 +188,13 @@ The application automatically handles:
 
 ### Architecture
 
+AI coding agents should refer to [AGENTS.md](AGENTS.md) for detailed project context and coding standards.
+
 ```
 TracerTemplateMaker/
 ├── main.py                      # Main application & UI
+├── AGENTS.md                    # Instructions for AI assistants
 ├── modules/
-│   ├── image_processor.py       # Image processing & layer separation
-│   ├── svg_generator.py         # SVG export with layers
-│   ├── stl_generator.py         # 3D mesh & STL export
-│   └── ui_components.py         # Reusable UI widgets
-├── Examples/                    # Sample templates
-├── pyproject.toml               # Project configuration & dependencies
-└── CHANGELOG.md                 # Version history
 ```
 
 ### Dependencies

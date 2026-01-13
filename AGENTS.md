@@ -1,5 +1,7 @@
 # TracerTemplateMaker
 
+> This file provides project context and guidelines specifically for AI coding agents.
+
 ## Project Overview
 
 **TracerTemplateMaker** is a Python desktop application (PyQt6) that converts photographs of physical tracing templates into precise digital formats. It automates the creation of:

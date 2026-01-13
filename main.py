@@ -726,36 +726,59 @@ class STLGeneratorDialog(QDialog):
         # Render mesh to image
         fig = plt.figure(figsize=(8, 6))
         ax = fig.add_subplot(111, projection='3d')
-
-        # Plot the mesh
-        vertices = mesh_to_render.vertices
-        faces = mesh_to_render.faces
-
-        # Sample faces for faster rendering
-        if len(faces) > 5000:
-            sample_indices = np.random.choice(len(faces), 5000, replace=False)
-            faces = faces[sample_indices]
-
-        x, y, z = vertices[:, 0], vertices[:, 1], vertices[:, 2]
-        ax.plot_trisurf(x, y, z, triangles=faces, cmap='viridis',
-                       alpha=0.8, edgecolor='none', shade=True)
+        
+        # Optimization: Simplify mesh if too large
+        is_point_cloud = False
+        TARGET_FACES = 5000
+        MAX_RENDER_FACES = 10000
+        
+        if len(mesh_to_render.faces) > TARGET_FACES:
+            try:
+                # Attempt simplification (requires optional dependencies like fast-simplification or open3d)
+                mesh_to_render = mesh_to_render.simplify_quadric_decimation(TARGET_FACES)
+            except Exception:
+                # Simplification failed (likely missing dependencies)
+                pass
+        
+        # Decision: Surface render or Point Cloud?
+        if len(mesh_to_render.faces) > MAX_RENDER_FACES:
+            # Too many faces for plot_trisurf to handle efficiently
+            is_point_cloud = True
+            # Sample points for point cloud
+            points = mesh_to_render.sample(5000)
+            x, y, z = points[:, 0], points[:, 1], points[:, 2]
+            ax.scatter(x, y, z, s=1, c='gray', alpha=0.5)
+            title = 'STL Preview (Point Cloud - High Detail)'
+        else:
+            # Render surface
+            vertices = mesh_to_render.vertices
+            faces = mesh_to_render.faces
+            x, y, z = vertices[:, 0], vertices[:, 1], vertices[:, 2]
+            ax.plot_trisurf(x, y, z, triangles=faces, cmap='viridis',
+                           alpha=0.8, edgecolor='none', shade=True)
+            title = 'STL Preview (Text side on top)'
 
         # Set labels and view
         ax.set_xlabel('X (mm)')
         ax.set_ylabel('Y (mm)')
         ax.set_zlabel('Z (mm)')
-        ax.set_title('STL Preview (Text side on top)')
+        ax.set_title(title)
 
         # Set equal aspect ratio
-        max_range = np.array([vertices[:, 0].max() - vertices[:, 0].min(),
-                             vertices[:, 1].max() - vertices[:, 1].min(),
-                             vertices[:, 2].max() - vertices[:, 2].min()]).max() / 2.0
-        mid_x = (vertices[:, 0].max() + vertices[:, 0].min()) * 0.5
-        mid_y = (vertices[:, 1].max() + vertices[:, 1].min()) * 0.5
-        mid_z = (vertices[:, 2].max() + vertices[:, 2].min()) * 0.5
-        ax.set_xlim(mid_x - max_range, mid_x + max_range)
-        ax.set_ylim(mid_y - max_range, mid_y + max_range)
-        ax.set_zlim(mid_z - max_range, mid_z + max_range)
+        if is_point_cloud:
+             # Use points for bounds
+             bounds_min = points.min(axis=0)
+             bounds_max = points.max(axis=0)
+        else:
+             bounds_min = mesh_to_render.bounds[0]
+             bounds_max = mesh_to_render.bounds[1]
+
+        max_range = (bounds_max - bounds_min).max() / 2.0
+        mid = (bounds_max + bounds_min) * 0.5
+        
+        ax.set_xlim(mid[0] - max_range, mid[0] + max_range)
+        ax.set_ylim(mid[1] - max_range, mid[1] + max_range)
+        ax.set_zlim(mid[2] - max_range, mid[2] + max_range)
 
         ax.view_init(elev=30, azim=45)
 

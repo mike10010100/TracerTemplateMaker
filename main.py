@@ -721,6 +721,7 @@ class STLGeneratorDialog(QDialog):
         matplotlib.use('Agg')
         import matplotlib.pyplot as plt
         from mpl_toolkits.mplot3d import Axes3D
+        from mpl_toolkits.mplot3d.art3d import Poly3DCollection
         from io import BytesIO
         import trimesh
         import numpy as np
@@ -773,16 +774,15 @@ class STLGeneratorDialog(QDialog):
         ax = fig.add_subplot(111, projection='3d')
         
         # Render surface
-        # We render the full mesh without simplification to ensure visual fidelity.
-        # Simplification algorithms (like quadric decimation) often destroy the topology
-        # of flat, extruded shapes with holes, causing "webbing" artifacts.
-        vertices = mesh_to_render.vertices
-        faces = mesh_to_render.faces
-        x, y, z = vertices[:, 0], vertices[:, 1], vertices[:, 2]
+        # We render the full mesh using Poly3DCollection which is robust for complex topologies
+        # Simplification algorithms often destroy topology of flat, extruded shapes.
         
-        # Note: plot_trisurf can be slow for large meshes but provides the accurate view user requested
-        ax.plot_trisurf(x, y, z, triangles=faces, cmap='viridis',
-                       alpha=0.8, edgecolor='none', shade=True)
+        # Use Poly3DCollection to avoid plot_trisurf artifacts ("random triangles")
+        # on flat surfaces with holes.
+        # Note: trimesh.Trimesh.triangles contains the (n, 3, 3) vertex data
+        mesh_poly = Poly3DCollection(mesh_to_render.triangles, alpha=0.8, shade=True, facecolors=(0.2, 0.7, 0.8))
+        mesh_poly.set_edgecolor('none')
+        ax.add_collection3d(mesh_poly)
         title = 'STL Preview (Text side on top)'
 
         # Set labels and view

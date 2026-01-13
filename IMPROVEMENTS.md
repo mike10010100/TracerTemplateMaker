@@ -35,7 +35,7 @@ This document outlines recommended improvements for the TracerTemplateMaker proj
 **Goal:** adhere to modern Python standards.
 
 -   **Logging:** Replace `print()` statements (especially in `stl_generator.py`) with the `logging` module. This enables file-based logging for easier user debugging.
--   **Packaging:** Create a `pyproject.toml` file to standardize build and dependency management, replacing or supplementing `requirements.txt`.
+-   **Packaging:** (Completed) Created `pyproject.toml` to standardize build and dependency management, replacing `requirements.txt`.
 -   **Type Hinting:** Ensure all public methods across modules have complete type hints (mypy compliance).
 
 ## 5. Robustness (Low Priority)

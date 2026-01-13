@@ -62,7 +62,7 @@ Whether you need to digitize vintage templates, create duplicates, or modify exi
 4. **Install dependencies**
    ```bash
    pip install --upgrade pip
-   pip install -r requirements.txt
+   pip install .
    ```
 
 5. **Run the application**
@@ -197,7 +197,7 @@ TracerTemplateMaker/
 │   ├── stl_generator.py         # 3D mesh & STL export
 │   └── ui_components.py         # Reusable UI widgets
 ├── Examples/                    # Sample templates
-├── requirements.txt             # Python dependencies
+├── pyproject.toml               # Project configuration & dependencies
 └── CHANGELOG.md                 # Version history
 ```
 
@@ -250,7 +250,7 @@ The application maintains pixel-to-millimeter scaling throughout the entire pipe
 
 **Issue: Application won't start**
 - Ensure virtual environment is activated: `(venv)` appears in terminal
-- Reinstall dependencies: `pip install -r requirements.txt`
+- Reinstall dependencies: `pip install .`
 - Check Python version: `python --version` (needs 3.8+)
 
 ### Getting Better Results

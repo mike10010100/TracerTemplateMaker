@@ -13,7 +13,7 @@ The application maintains **dimensional accuracy** throughout the conversion pro
 ```
 TracerTemplateMaker/
 ├── main.py                      # Main application entry point
-├── requirements.txt             # Python dependencies
+├── pyproject.toml               # Project configuration & dependencies
 ├── README.md                    # User documentation
 ├── SETUP_GUIDE.md              # Detailed setup instructions
 ├── PROJECT_SUMMARY.md          # This file
@@ -219,7 +219,7 @@ run.bat
 ```bash
 python3 -m venv venv
 source venv/bin/activate  # or venv\Scripts\activate on Windows
-pip install -r requirements.txt
+pip install .
 python main.py
 ```
 

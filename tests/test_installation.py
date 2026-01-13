@@ -83,7 +83,7 @@ def main():
         print(f"FAILED: {failed} of {total} tests failed")
         print()
         print("Please install missing packages:")
-        print("  pip install -r requirements.txt")
+        print("  pip install .")
         return 1
 
 if __name__ == "__main__":

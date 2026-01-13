@@ -184,7 +184,7 @@ def main():
     else:
         print("❌ Some tests failed. Please check the errors above.")
         print("\nTry reinstalling dependencies:")
-        print("  pip install -r requirements.txt")
+        print("  pip install .")
         return 1
 
 if __name__ == "__main__":

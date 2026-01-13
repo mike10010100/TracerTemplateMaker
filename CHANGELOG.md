@@ -1,6 +1,23 @@
 # TracerTemplateMaker - Changelog
 
-## Version 1.6.0 - 2026-01-12 (Current)
+## Version 1.6.1 - 2026-01-12 (Consolidated Improvements)
+
+### 🚀 UI Responsiveness & Rendering Improvements
+
+#### Asynchronous Processing & Debouncing
+- **Problem**: UI would freeze for several seconds during image processing when adjusting sliders.
+- **Solution**: Moved all image processing tasks to background threads.
+- **Enhancement**: Implemented a 150ms debounce timer for slider inputs to prevent processing backlogs during rapid adjustments.
+
+#### 3D STL Preview Reliability
+- **Fix**: Resolved a crash caused by a missing `QPixmap` import in the preview dialog.
+- **Performance**: Moved STL mesh generation and 3D rendering to background threads to eliminate UI hangs.
+- **Quality**: Replaced the "bizarre" random face sampling with a robust rendering strategy (topological simplification with a point-cloud fallback for extremely large meshes), ensuring the preview accurately represents the final output.
+
+#### UI Interaction Fixes
+- **Fix**: Disabled mouse wheel adjustments on sliders and spinboxes. This prevents accidental setting changes while scrolling through the control panel.
+
+## Version 1.6.0 - 2026-01-12
 
 ### 🎯 Major Enhancements: Independent Layer Controls, STL Preview & Fixes
 

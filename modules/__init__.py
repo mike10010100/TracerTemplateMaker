@@ -5,17 +5,16 @@ This package contains all the core processing modules for the application.
 """
 
 from .image_processor import ImageProcessor
-from .svg_generator import SVGGenerator
 from .stl_generator import STLGenerator
-from .ui_components import (ImagePreviewWidget, ControlPanel,
-                            DimensionInputPanel, ColorPickerPanel)
+from .svg_generator import SVGGenerator
+from .ui_components import ColorPickerPanel, ControlPanel, DimensionInputPanel, ImagePreviewWidget
 
 __all__ = [
-    'ImageProcessor',
-    'SVGGenerator',
-    'STLGenerator',
-    'ImagePreviewWidget',
-    'ControlPanel',
-    'DimensionInputPanel',
-    'ColorPickerPanel'
+    "ImageProcessor",
+    "SVGGenerator",
+    "STLGenerator",
+    "ImagePreviewWidget",
+    "ControlPanel",
+    "DimensionInputPanel",
+    "ColorPickerPanel",
 ]

@@ -1,5 +1,6 @@
 @echo off
 REM Quick start script for TracerTemplateMaker (Windows)
+pushd "%~dp0"
 
 echo TracerTemplateMaker - Quick Start
 echo ==================================
@@ -21,7 +22,7 @@ python -c "import cv2" 2>nul
 if errorlevel 1 (
     echo Installing dependencies...
     pip install --upgrade pip
-    pip install -r requirements.txt
+    pip install -e .
     echo Dependencies installed
 )
 
@@ -29,4 +30,5 @@ REM Run the application
 echo Starting TracerTemplateMaker...
 python main.py
 
+popd
 pause

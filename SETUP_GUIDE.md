@@ -84,14 +84,11 @@ source venv/bin/activate
 
 You should see `(venv)` appear at the start of your command prompt.
 
-## Installing Dependencies
-
-With the virtual environment activated, first upgrade pip, then install all required packages:
-
-```bash
-pip install --upgrade pip
-pip install -r requirements.txt
-```
+4. **Install Dependencies**
+   Run the following command to install all necessary Python libraries:
+   ```bash
+   pip install .
+   ```
 
 This will install:
 - OpenCV for image processing
@@ -108,7 +105,7 @@ This will install:
 After installation, you can verify everything is working:
 
 ```bash
-python test_installation.py
+tracertemplatemaker-test
 ```
 
 You should see "SUCCESS: All tests passed!" if everything is installed correctly.
@@ -192,9 +189,10 @@ The TracerTemplateMaker window should open.
 
 ### Issue: "No module named 'cv2'" or similar
 
-**Solution**:
-- Make sure your virtual environment is activated (you should see `(venv)`)
-- Run `pip install -r requirements.txt` again
+   - **Solution:** Force a reinstall of the requirements.
+     ```bash
+     pip install . --upgrade
+     ```
 
 ### Issue: Application won't start
 
@@ -290,7 +288,7 @@ source venv/bin/activate  # macOS/Linux
 venv\Scripts\activate  # Windows
 
 # Update dependencies
-pip install -r requirements.txt --upgrade
+pip install . --upgrade
 ```
 
 ---

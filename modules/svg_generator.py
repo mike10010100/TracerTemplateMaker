@@ -8,11 +8,11 @@ This module handles conversion of processed images to SVG vector format with:
 - Bezier curve optimization
 """
 
+from typing import List, Sequence, Tuple
+
 import cv2
 import numpy as np
 import svgwrite
-from typing import List, Tuple
-from svgwrite import mm
 
 
 class SVGGenerator:
@@ -26,7 +26,7 @@ class SVGGenerator:
 
         Args:
             width_mm: Output width in millimeters
-            height_mm: Output height in millimeters
+            height_mm: Height in millimeters
         """
         self.width_mm = width_mm
         self.height_mm = height_mm
@@ -63,7 +63,9 @@ class SVGGenerator:
             return ""  # Need at least 3 points for a valid path
 
         # Start path with Move command
-        path_data = f"M {contour[0][0][0] * self.scale_factor:.3f},{contour[0][0][1] * self.scale_factor:.3f}"
+        x_start = contour[0][0][0] * self.scale_factor
+        y_start = contour[0][0][1] * self.scale_factor
+        path_data = f"M {x_start:.3f},{y_start:.3f}"
 
         # Add Line commands for each subsequent point
         for point in contour[1:]:
@@ -75,8 +77,9 @@ class SVGGenerator:
         path_data += " Z"
         return path_data
 
-    def create_svg_from_masks(self, profile_mask: np.ndarray, text_mask: np.ndarray,
-                             output_path: str) -> str:
+    def create_svg_from_masks(
+        self, profile_mask: np.ndarray, text_mask: np.ndarray, output_path: str
+    ) -> str:
         """
         Create SVG file with two layers from binary masks.
 
@@ -95,13 +98,13 @@ class SVGGenerator:
         # Create SVG drawing with exact dimensions
         dwg = svgwrite.Drawing(
             output_path,
-            size=(f'{self.width_mm}mm', f'{self.height_mm}mm'),
-            viewBox=f'0 0 {self.width_mm} {self.height_mm}'
+            size=(f"{self.width_mm}mm", f"{self.height_mm}mm"),
+            viewBox=f"0 0 {self.width_mm} {self.height_mm}",
         )
 
         # Add layer groups
-        profile_layer = dwg.g(id='profile_layer', fill='none', stroke='black', stroke_width='0.1mm')
-        text_layer = dwg.g(id='text_layer', fill='black', stroke='none')
+        profile_layer = dwg.g(id="profile_layer", fill="none", stroke="black", stroke_width="0.1mm")
+        text_layer = dwg.g(id="text_layer", fill="black", stroke="none")
 
         # Process profile mask - find contours
         profile_contours = self.find_contours_from_mask(profile_mask)
@@ -110,7 +113,7 @@ class SVGGenerator:
         for i, contour in enumerate(profile_contours):
             path_data = self.contour_to_path_data(contour)
             if path_data:
-                profile_layer.add(dwg.path(d=path_data, id=f'profile_{i}'))
+                profile_layer.add(dwg.path(d=path_data, id=f"profile_{i}"))
 
         # Process text mask - find contours
         text_contours = self.find_contours_from_mask(text_mask)
@@ -119,7 +122,7 @@ class SVGGenerator:
         for i, contour in enumerate(text_contours):
             path_data = self.contour_to_path_data(contour)
             if path_data:
-                text_layer.add(dwg.path(d=path_data, id=f'text_{i}', fill='black'))
+                text_layer.add(dwg.path(d=path_data, id=f"text_{i}", fill="black"))
 
         # Add layers to drawing
         dwg.add(profile_layer)
@@ -129,7 +132,7 @@ class SVGGenerator:
         dwg.save()
         return output_path
 
-    def find_contours_from_mask(self, mask: np.ndarray) -> List[np.ndarray]:
+    def find_contours_from_mask(self, mask: np.ndarray) -> Sequence[np.ndarray]:
         """
         Find contours from binary mask.
 
@@ -142,12 +145,17 @@ class SVGGenerator:
         contours, hierarchy = cv2.findContours(
             mask,
             cv2.RETR_CCOMP,  # Retrieve both external and hole contours
-            cv2.CHAIN_APPROX_SIMPLE
+            cv2.CHAIN_APPROX_SIMPLE,
         )
         return contours
 
-    def create_simple_svg(self, binary_mask: np.ndarray, output_path: str,
-                         fill_color: str = 'black', stroke_color: str = 'none') -> str:
+    def create_simple_svg(
+        self,
+        binary_mask: np.ndarray,
+        output_path: str,
+        fill_color: str = "black",
+        stroke_color: str = "none",
+    ) -> str:
         """
         Create simple single-layer SVG from binary mask.
 
@@ -167,8 +175,8 @@ class SVGGenerator:
         # Create SVG drawing
         dwg = svgwrite.Drawing(
             output_path,
-            size=(f'{self.width_mm}mm', f'{self.height_mm}mm'),
-            viewBox=f'0 0 {self.width_mm} {self.height_mm}'
+            size=(f"{self.width_mm}mm", f"{self.height_mm}mm"),
+            viewBox=f"0 0 {self.width_mm} {self.height_mm}",
         )
 
         # Find and add contours
@@ -177,17 +185,16 @@ class SVGGenerator:
         for i, contour in enumerate(contours):
             path_data = self.contour_to_path_data(contour)
             if path_data:
-                dwg.add(dwg.path(
-                    d=path_data,
-                    id=f'shape_{i}',
-                    fill=fill_color,
-                    stroke=stroke_color
-                ))
+                dwg.add(
+                    dwg.path(d=path_data, id=f"shape_{i}", fill=fill_color, stroke=stroke_color)
+                )
 
         dwg.save()
         return output_path
 
-    def optimize_paths(self, contours: List[np.ndarray], tolerance: float = 1.0) -> List[np.ndarray]:
+    def optimize_paths(
+        self, contours: List[np.ndarray], tolerance: float = 1.0
+    ) -> Sequence[np.ndarray]:
         """
         Optimize contour paths by reducing number of points.
 
@@ -215,8 +222,9 @@ class SVGGenerator:
         """
         return self.width_mm, self.height_mm
 
-    def add_metadata(self, dwg: svgwrite.Drawing, description: str = "",
-                    creator: str = "TracerTemplateMaker"):
+    def add_metadata(
+        self, dwg: svgwrite.Drawing, description: str = "", creator: str = "TracerTemplateMaker"
+    ):
         """
         Add metadata to SVG file.
 
@@ -229,8 +237,13 @@ class SVGGenerator:
         desc_text = f"{description} - Created by {creator}"
         dwg.set_desc(title="Tracing Template", desc=desc_text)
 
-    def create_layered_svg(self, profile_mask: np.ndarray, text_mask: np.ndarray,
-                          output_path: str, include_metadata: bool = True) -> str:
+    def create_layered_svg(
+        self,
+        profile_mask: np.ndarray,
+        text_mask: np.ndarray,
+        output_path: str,
+        include_metadata: bool = True,
+    ) -> str:
         """
         Create a complete SVG with properly organized layers.
         This is the main method for generating production SVG files.
@@ -252,9 +265,9 @@ class SVGGenerator:
         # Set profile='tiny' to disable strict validation for custom attributes
         dwg = svgwrite.Drawing(
             output_path,
-            size=(f'{self.width_mm}mm', f'{self.height_mm}mm'),
-            viewBox=f'0 0 {self.width_mm} {self.height_mm}',
-            profile='tiny'  # Use 'tiny' profile to allow custom attributes
+            size=(f"{self.width_mm}mm", f"{self.height_mm}mm"),
+            viewBox=f"0 0 {self.width_mm} {self.height_mm}",
+            profile="tiny",  # Use 'tiny' profile to allow custom attributes
         )
 
         # Add metadata if requested
@@ -264,20 +277,20 @@ class SVGGenerator:
         # Layer 1: Profile and holes (for cutting/outline)
         # Using clear IDs instead of Inkscape-specific attributes for compatibility
         profile_layer = dwg.g(
-            id='layer_1_profile_and_holes',
-            fill='none',  # No fill - just outlines
-            stroke='black',
-            stroke_width='0.1mm',
-            class_='profile-layer'
+            id="layer_1_profile_and_holes",
+            fill="none",  # No fill - just outlines
+            stroke="black",
+            stroke_width="0.1mm",
+            class_="profile-layer",
         )
 
         # Layer 2: Text and markings (for engraving/secondary color)
         text_layer = dwg.g(
-            id='layer_2_text_and_markings',
-            fill='none',  # No fill - just outlines for laser cutting/engraving
-            stroke='red',  # Different color to distinguish from profile layer
-            stroke_width='0.1mm',
-            class_='text-layer'
+            id="layer_2_text_and_markings",
+            fill="none",  # No fill - just outlines for laser cutting/engraving
+            stroke="red",  # Different color to distinguish from profile layer
+            stroke_width="0.1mm",
+            class_="text-layer",
         )
 
         # Process and add profile contours
@@ -285,20 +298,14 @@ class SVGGenerator:
         for i, contour in enumerate(profile_contours):
             path_data = self.contour_to_path_data(contour, simplify=True)
             if path_data:
-                profile_layer.add(dwg.path(
-                    d=path_data,
-                    id=f'profile_path_{i}'
-                ))
+                profile_layer.add(dwg.path(d=path_data, id=f"profile_path_{i}"))
 
         # Process and add text contours
         text_contours = self.find_contours_from_mask(text_mask)
         for i, contour in enumerate(text_contours):
             path_data = self.contour_to_path_data(contour, simplify=True)
             if path_data:
-                text_layer.add(dwg.path(
-                    d=path_data,
-                    id=f'text_path_{i}'
-                ))
+                text_layer.add(dwg.path(d=path_data, id=f"text_path_{i}"))
 
         # Add layers to drawing in correct order
         dwg.add(profile_layer)

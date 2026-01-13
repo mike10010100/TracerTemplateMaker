@@ -3,10 +3,11 @@
 Test script to verify STL generation creates watertight meshes with holes as voids.
 """
 
-import numpy as np
 import cv2
+import numpy as np
+
 from modules.stl_generator import STLGenerator
-import trimesh
+
 
 def create_test_mask():
     """
@@ -27,6 +28,7 @@ def create_test_mask():
 
     return mask
 
+
 def test_stl_generation():
     """Test STL generation and verify watertight mesh."""
 
@@ -34,7 +36,7 @@ def test_stl_generation():
     test_mask = create_test_mask()
 
     # Save mask for visual verification
-    cv2.imwrite('/tmp/test_mask.png', test_mask)
+    cv2.imwrite("/tmp/test_mask.png", test_mask)
     print("Test mask saved to: /tmp/test_mask.png")
 
     # Initialize STL generator with test dimensions
@@ -44,23 +46,21 @@ def test_stl_generation():
     # Generate STL mesh
     print("Generating 3D mesh with 2mm thickness...")
     mesh = generator.extrude_mask_to_mesh(
-        binary_mask=test_mask,
-        thickness_mm=2.0,
-        base_height_mm=0.0
+        binary_mask=test_mask, thickness_mm=2.0, base_height_mm=0.0
     )
 
     # Get mesh statistics
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("MESH STATISTICS")
-    print("="*60)
+    print("=" * 60)
     stats = generator.get_mesh_stats(mesh)
     for key, value in stats.items():
         print(f"{key}: {value}")
 
     # Verify watertight
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("WATERTIGHT VERIFICATION")
-    print("="*60)
+    print("=" * 60)
     if mesh.is_watertight:
         print("✅ SUCCESS: Mesh is WATERTIGHT!")
     else:
@@ -68,7 +68,7 @@ def test_stl_generation():
         print(f"   Mesh has {len(mesh.vertices)} vertices and {len(mesh.faces)} faces")
 
     # Export STL for external verification
-    output_path = '/tmp/test_output.stl'
+    output_path = "/tmp/test_output.stl"
     mesh.export(output_path)
     print(f"\n✅ STL exported to: {output_path}")
     print("   You can open this file in a 3D viewer to verify:")
@@ -76,9 +76,9 @@ def test_stl_generation():
     print("   - Inner circles remain as empty holes (voids)")
 
     # Validate dimensions
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("DIMENSIONAL ACCURACY")
-    print("="*60)
+    print("=" * 60)
     if generator.validate_dimensions(mesh, tolerance_mm=0.5):
         print("✅ SUCCESS: Dimensions are within tolerance!")
     else:
@@ -89,11 +89,12 @@ def test_stl_generation():
         print(f"   Expected: {generator.width_mm}mm x {generator.height_mm}mm")
         print(f"   Actual:   {actual_width:.2f}mm x {actual_height:.2f}mm")
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("TEST COMPLETE")
-    print("="*60)
+    print("=" * 60)
 
     return mesh.is_watertight
+
 
 if __name__ == "__main__":
     success = test_stl_generation()

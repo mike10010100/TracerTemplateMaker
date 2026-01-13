@@ -8,10 +8,11 @@ This module handles all image processing operations including:
 - Image enhancement (contrast, brightness, sharpness)
 """
 
+from typing import Sequence, Tuple
+
 import cv2
 import numpy as np
 from PIL import Image, ImageEnhance
-from typing import Tuple, List, Optional
 
 
 class ImageProcessor:
@@ -129,8 +130,9 @@ class ImageProcessor:
             return image
         return cv2.GaussianBlur(image, (kernel_size, kernel_size), 0)
 
-    def extract_color_mask(self, image: np.ndarray, target_color: Tuple[int, int, int],
-                          tolerance: int = 30) -> np.ndarray:
+    def extract_color_mask(
+        self, image: np.ndarray, target_color: Tuple[int, int, int], tolerance: int = 30
+    ) -> np.ndarray:
         """
         Extract a mask for pixels matching a specific color.
         Useful for separating background, text, or specific features.
@@ -145,7 +147,8 @@ class ImageProcessor:
         """
         # Convert BGR to HSV for better color matching
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-        target_hsv = cv2.cvtColor(np.uint8([[target_color]]), cv2.COLOR_BGR2HSV)[0][0]
+        target_bgr = np.array([[target_color]], dtype=np.uint8)
+        target_hsv = cv2.cvtColor(target_bgr, cv2.COLOR_BGR2HSV)[0][0]
 
         # Define color range based on tolerance
         # Use int() to prevent overflow warnings
@@ -156,8 +159,9 @@ class ImageProcessor:
         mask = cv2.inRange(hsv, lower, upper)
         return mask
 
-    def detect_edges_canny(self, image: np.ndarray, threshold1: int = 50,
-                          threshold2: int = 150) -> np.ndarray:
+    def detect_edges_canny(
+        self, image: np.ndarray, threshold1: int = 50, threshold2: int = 150
+    ) -> np.ndarray:
         """
         Detect edges using Canny edge detection.
 
@@ -179,7 +183,7 @@ class ImageProcessor:
         edges = cv2.Canny(gray, threshold1, threshold2)
         return edges
 
-    def find_contours(self, binary_image: np.ndarray) -> List[np.ndarray]:
+    def find_contours(self, binary_image: np.ndarray) -> Sequence[np.ndarray]:
         """
         Find contours in a binary image.
 
@@ -187,17 +191,18 @@ class ImageProcessor:
             binary_image: Binary image (0 or 255)
 
         Returns:
-            List of contours as numpy arrays
+            Sequence of contours as numpy arrays
         """
         contours, hierarchy = cv2.findContours(
             binary_image,
             cv2.RETR_TREE,  # Retrieve all contours with hierarchy
-            cv2.CHAIN_APPROX_SIMPLE  # Compress contours to save memory
+            cv2.CHAIN_APPROX_SIMPLE,  # Compress contours to save memory
         )
         return contours
 
-    def threshold_image(self, image: np.ndarray, threshold_value: int = 127,
-                       inverse: bool = False) -> np.ndarray:
+    def threshold_image(
+        self, image: np.ndarray, threshold_value: int = 127, inverse: bool = False
+    ) -> np.ndarray:
         """
         Apply binary threshold to image.
 
@@ -219,16 +224,19 @@ class ImageProcessor:
         _, binary = cv2.threshold(gray, threshold_value, 255, threshold_type)
         return binary
 
-    def separate_layers(self, image: np.ndarray,
-                       background_color: Tuple[int, int, int],
-                       tracer_color: Tuple[int, int, int],
-                       text_color: Tuple[int, int, int],
-                       profile_tolerance: int = 30,
-                       profile_threshold: int = 200,
-                       profile_smoothing: int = 5,
-                       text_tolerance: int = 30,
-                       text_threshold: int = 127,
-                       text_detail: int = 2) -> Tuple[np.ndarray, np.ndarray]:
+    def separate_layers(
+        self,
+        image: np.ndarray,
+        background_color: Tuple[int, int, int],
+        tracer_color: Tuple[int, int, int],
+        text_color: Tuple[int, int, int],
+        profile_tolerance: int = 30,
+        profile_threshold: int = 200,
+        profile_smoothing: int = 5,
+        text_tolerance: int = 30,
+        text_threshold: int = 127,
+        text_detail: int = 2,
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Separate image into two layers with independent controls:
         1. Profile layer: Holes (background color showing through tracer)
@@ -317,8 +325,13 @@ class ImageProcessor:
         """
         return self.scale_factor
 
-    def process_image(self, contrast: float = 1.0, brightness: float = 1.0,
-                     sharpness: float = 1.0, blur_kernel: int = 0) -> np.ndarray:
+    def process_image(
+        self,
+        contrast: float = 1.0,
+        brightness: float = 1.0,
+        sharpness: float = 1.0,
+        blur_kernel: int = 0,
+    ) -> np.ndarray:
         """
         Apply all processing steps to the original image.
 

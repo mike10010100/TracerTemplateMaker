@@ -8,11 +8,15 @@ This module handles conversion of SVG/masks to 3D STL models:
 - STL file export
 """
 
-import numpy as np
-from stl import mesh
+from typing import Optional
+
 import cv2
-from typing import List, Tuple, Optional
+import numpy as np
 import trimesh
+
+from modules.logger import setup_logger
+
+logger = setup_logger("STLGenerator")
 
 
 class STLGenerator:
@@ -42,8 +46,9 @@ class STLGenerator:
         """
         self.scale_factor = self.width_mm / pixel_width
 
-    def extrude_mask_to_mesh(self, binary_mask: np.ndarray, thickness_mm: float,
-                            base_height_mm: float = 0.0) -> trimesh.Trimesh:
+    def extrude_mask_to_mesh(
+        self, binary_mask: np.ndarray, thickness_mm: float, base_height_mm: float = 0.0
+    ) -> trimesh.Trimesh:
         """
         Extrude a 2D binary mask into a 3D mesh with proper hole handling.
 
@@ -63,7 +68,7 @@ class STLGenerator:
         contours, hierarchy = cv2.findContours(
             binary_mask,
             cv2.RETR_CCOMP,  # Get both outer and inner contours
-            cv2.CHAIN_APPROX_SIMPLE
+            cv2.CHAIN_APPROX_SIMPLE,
         )
 
         if len(contours) == 0:
@@ -78,13 +83,13 @@ class STLGenerator:
         contour_data = []
         for i, c in enumerate(contours):
             area_pixels = cv2.contourArea(c)
-            area_mm = area_pixels * (self.scale_factor ** 2)
+            area_mm = area_pixels * (self.scale_factor**2)
             if area_mm >= MIN_CONTOUR_AREA or len(c) >= 3:
                 contour_data.append((i, c, area_mm))
 
         # If too many contours, keep only the largest ones
         if len(contour_data) > MAX_CONTOURS:
-            print(f"Warning: Too many contours ({len(contour_data)}), limiting to {MAX_CONTOURS}")
+            logger.warning(f"Too many contours ({len(contour_data)}), limiting to {MAX_CONTOURS}")
             # Sort by area and keep largest
             contour_data.sort(key=lambda x: x[2], reverse=True)
             contour_data = contour_data[:MAX_CONTOURS]
@@ -93,14 +98,18 @@ class STLGenerator:
             filtered_contours = [c for _, c, _ in contour_data]
             temp_mask = np.zeros_like(binary_mask)
             cv2.drawContours(temp_mask, filtered_contours, -1, 255, -1)
-            contours, hierarchy = cv2.findContours(temp_mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
-            print(f"Reduced to {len(contours)} contours after filtering")
+            contours, hierarchy = cv2.findContours(
+                temp_mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE
+            )
+            logger.info(f"Reduced to {len(contours)} contours after filtering")
         elif len(contour_data) < len(contours):
-            print(f"Filtered out {len(contours) - len(contour_data)} tiny contours (noise)")
+            logger.info(f"Filtered out {len(contours) - len(contour_data)} tiny contours (noise)")
             filtered_contours = [c for _, c, _ in contour_data]
             temp_mask = np.zeros_like(binary_mask)
             cv2.drawContours(temp_mask, filtered_contours, -1, 255, -1)
-            contours, hierarchy = cv2.findContours(temp_mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
+            contours, hierarchy = cv2.findContours(
+                temp_mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE
+            )
 
         # Hierarchy format: [Next, Previous, First_Child, Parent]
         # hierarchy[0][i][3] == -1 means outer contour (no parent)
@@ -138,7 +147,10 @@ class STLGenerator:
                 # Safety check: Skip polygons with too many vertices (potential hang)
                 MAX_VERTICES = 5000
                 if len(outer_polygon) > MAX_VERTICES:
-                    print(f"Warning: Contour {idx} has too many vertices ({len(outer_polygon)}), simplifying...")
+                    logger.warning(
+                        f"Contour {idx} has too many vertices ({len(outer_polygon)}), "
+                        "simplifying..."
+                    )
                     # Simplify the polygon
                     epsilon = 0.01 * cv2.arcLength(contour, True)
                     simplified = cv2.approxPolyDP(contour, epsilon, True)
@@ -148,7 +160,10 @@ class STLGenerator:
                     # Limit number of holes to prevent complexity explosion
                     MAX_HOLES = 100
                     if len(holes) > MAX_HOLES:
-                        print(f"Warning: Contour {idx} has too many holes ({len(holes)}), limiting to {MAX_HOLES}")
+                        logger.warning(
+                            f"Contour {idx} has too many holes ({len(holes)}), "
+                            f"limiting to {MAX_HOLES}"
+                        )
                         # Sort holes by area and keep largest
                         hole_areas = [Polygon(h).area if len(h) >= 3 else 0 for h in holes]
                         sorted_holes = sorted(zip(hole_areas, holes), reverse=True)
@@ -160,16 +175,13 @@ class STLGenerator:
 
                 # Check if polygon is valid before extruding
                 if not polygon.is_valid:
-                    print(f"Warning: Invalid polygon for contour {idx}, attempting to fix...")
+                    logger.warning(f"Invalid polygon for contour {idx}, attempting to fix...")
                     polygon = polygon.buffer(0)  # Fix self-intersections
                     if not polygon.is_valid:
                         raise ValueError("Polygon cannot be fixed")
 
                 # Extrude polygon to 3D mesh
-                mesh = trimesh.creation.extrude_polygon(
-                    polygon,
-                    height=thickness_mm
-                )
+                mesh = trimesh.creation.extrude_polygon(polygon, height=thickness_mm)
 
                 # Translate mesh to correct base height
                 if base_height_mm != 0.0:
@@ -179,11 +191,13 @@ class STLGenerator:
 
             except Exception as e:
                 # If polygon creation fails, fall back to simple extrusion
-                print(f"Warning: Polygon extrusion failed for contour {idx}: {e}")
+                logger.warning(f"Polygon extrusion failed for contour {idx}: {e}")
                 # Create simple mesh without holes as fallback
-                mesh = self._create_simple_extrusion(outer_polygon, thickness_mm, base_height_mm)
-                if mesh is not None:
-                    all_meshes.append(mesh)
+                fallback_mesh = self._create_simple_extrusion(
+                    outer_polygon, thickness_mm, base_height_mm
+                )
+                if fallback_mesh is not None:
+                    all_meshes.append(fallback_mesh)
 
         # Combine all meshes
         if len(all_meshes) == 0:
@@ -210,8 +224,9 @@ class STLGenerator:
             points_2d.append([x, y])
         return np.array(points_2d)
 
-    def _create_simple_extrusion(self, polygon: np.ndarray, thickness_mm: float,
-                                base_height_mm: float) -> Optional[trimesh.Trimesh]:
+    def _create_simple_extrusion(
+        self, polygon: np.ndarray, thickness_mm: float, base_height_mm: float
+    ) -> Optional[trimesh.Trimesh]:
         """
         Create simple extrusion without holes (fallback method).
 
@@ -225,39 +240,28 @@ class STLGenerator:
         """
         try:
             from shapely.geometry import Polygon as ShapelyPolygon
+
             poly = ShapelyPolygon(polygon)
             mesh = trimesh.creation.extrude_polygon(poly, height=thickness_mm)
             if base_height_mm != 0.0:
                 mesh.apply_translation([0, 0, base_height_mm])
             return mesh
-        except:
+        except Exception:
             return None
 
-    def close_mesh_caps(self, mesh: trimesh.Trimesh, binary_mask: np.ndarray,
-                       base_height: float, thickness: float) -> trimesh.Trimesh:
-        """
-        Verify mesh is watertight (should already be from extrude_polygon).
-
-        Args:
-            mesh: Input mesh
-            binary_mask: Binary mask (not used, kept for compatibility)
-            base_height: Z-height of bottom (not used, kept for compatibility)
-            thickness: Extrusion thickness (not used, kept for compatibility)
-
-        Returns:
-            trimesh.Trimesh: Mesh (already watertight from extrude_polygon)
-        """
-        # The new extrude_polygon method creates watertight meshes automatically
-        # This method is kept for compatibility but no longer needs to do anything
-        return mesh
-
-    def create_dual_layer_stl(self, profile_mask: np.ndarray, text_mask: np.ndarray,
-                             base_thickness_mm: float, text_height_mm: float,
-                             output_path: str) -> str:
+    def create_dual_layer_stl(
+        self,
+        profile_mask: np.ndarray,
+        text_mask: np.ndarray,
+        base_thickness_mm: float,
+        text_height_mm: float,
+        output_path: str,
+    ) -> str:
         """
         Create STL with two layers for dual-color 3D printing:
         - Base layer: Main profile with holes (Z=0 to Z=base_thickness_mm)
-        - Text layer: Raised text on TOP of base (Z=base_thickness_mm to Z=base_thickness_mm+text_height_mm)
+        - Text layer: Raised text on TOP of base
+          (Z=base_thickness_mm to Z=base_thickness_mm+text_height_mm)
 
         Args:
             profile_mask: Binary mask for base profile
@@ -288,12 +292,14 @@ class STLGenerator:
 
         # Create Y-axis mirror transformation matrix
         # This reflects across the Y-axis (flips in XZ plane)
-        mirror_matrix = np.array([
-            [1, 0, 0, 0],   # Keep X
-            [0, 1, 0, 0],   # Keep Y
-            [0, 0, -1, 0],  # Flip Z (mirror on Y-axis)
-            [0, 0, 0, 1]
-        ])
+        mirror_matrix = np.array(
+            [
+                [1, 0, 0, 0],  # Keep X
+                [0, 1, 0, 0],  # Keep Y
+                [0, 0, -1, 0],  # Flip Z (mirror on Y-axis)
+                [0, 0, 0, 1],
+            ]
+        )
         combined_mesh.apply_transform(mirror_matrix)
 
         # After flipping, translate back to Z=0 (move to build plate)
@@ -309,17 +315,20 @@ class STLGenerator:
             try:
                 combined_mesh.fix_normals()
             except Exception as e:
-                print(f"Warning: Could not fix normals: {e}")
+                logger.warning(f"Could not fix normals: {e}")
                 # Continue anyway - mesh might still be usable
         else:
-            print(f"Warning: Mesh too complex ({len(combined_mesh.faces)} faces), skipping fix_normals()")
+            logger.warning(
+                f"Mesh too complex ({len(combined_mesh.faces)} faces), skipping fix_normals()"
+            )
 
         # Export to STL
         combined_mesh.export(output_path)
         return output_path
 
-    def create_simple_stl(self, binary_mask: np.ndarray, thickness_mm: float,
-                         output_path: str) -> str:
+    def create_simple_stl(
+        self, binary_mask: np.ndarray, thickness_mm: float, output_path: str
+    ) -> str:
         """
         Create simple single-layer STL from binary mask.
 
@@ -338,9 +347,14 @@ class STLGenerator:
         tri_mesh.export(output_path)
         return output_path
 
-    def create_template_stl(self, profile_mask: np.ndarray, text_mask: Optional[np.ndarray],
-                           thickness_mm: float, output_path: str,
-                           separate_text: bool = False) -> str:
+    def create_template_stl(
+        self,
+        profile_mask: np.ndarray,
+        text_mask: Optional[np.ndarray],
+        thickness_mm: float,
+        output_path: str,
+        separate_text: bool = False,
+    ) -> str:
         """
         Create STL model of tracing template.
 
@@ -362,8 +376,8 @@ class STLGenerator:
                 profile_mask,
                 text_mask,
                 thickness_mm,  # Base is full thickness
-                text_height,   # Text is fixed 0.2mm raised on top
-                output_path
+                text_height,  # Text is fixed 0.2mm raised on top
+                output_path,
             )
         else:
             # Create simple flat template
@@ -390,25 +404,25 @@ class STLGenerator:
         # Handle empty mesh case
         if bounds is None or len(mesh.vertices) == 0:
             return {
-                'vertices': 0,
-                'faces': 0,
-                'volume_mm3': 0.0,
-                'area_mm2': 0.0,
-                'is_watertight': False,
-                'bounds_min': [0, 0, 0],
-                'bounds_max': [0, 0, 0],
-                'dimensions_mm': [0, 0, 0]
+                "vertices": 0,
+                "faces": 0,
+                "volume_mm3": 0.0,
+                "area_mm2": 0.0,
+                "is_watertight": False,
+                "bounds_min": [0, 0, 0],
+                "bounds_max": [0, 0, 0],
+                "dimensions_mm": [0, 0, 0],
             }
 
         return {
-            'vertices': len(mesh.vertices),
-            'faces': len(mesh.faces),
-            'volume_mm3': mesh.volume,
-            'area_mm2': mesh.area,
-            'is_watertight': mesh.is_watertight,
-            'bounds_min': bounds[0].tolist(),
-            'bounds_max': bounds[1].tolist(),
-            'dimensions_mm': (bounds[1] - bounds[0]).tolist()
+            "vertices": len(mesh.vertices),
+            "faces": len(mesh.faces),
+            "volume_mm3": mesh.volume,
+            "area_mm2": mesh.area,
+            "is_watertight": mesh.is_watertight,
+            "bounds_min": bounds[0].tolist(),
+            "bounds_max": bounds[1].tolist(),
+            "dimensions_mm": (bounds[1] - bounds[0]).tolist(),
         }
 
     def validate_dimensions(self, mesh: trimesh.Trimesh, tolerance_mm: float = 0.1) -> bool:

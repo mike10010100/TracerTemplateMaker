@@ -1,0 +1,105 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tracertemplatemaker"
+version = "1.6.1"
+description = "Convert physical tracing templates into digital SVG and 3D-printable STL files"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "Open Source"}
+authors = [
+    {name = "TracerTemplateMaker Contributors"}
+]
+keywords = ["svg", "stl", "tracing", "template", "3d-printing", "opencv", "computer-vision"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: End Users/Desktop",
+    "Topic :: Multimedia :: Graphics :: 3D Modeling",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+    "License :: OSI Approved :: MIT License",
+]
+dependencies = [
+    "opencv-python>=4.8.0",
+    "numpy>=1.24.0",
+    "svgwrite>=1.4.3",
+    "trimesh>=4.0.0",
+    "shapely>=2.0.0",
+    "matplotlib>=3.7.0",
+    "Pillow>=10.0.0",
+    "scipy>=1.10.0",
+]
+
+[tool.ruff]
+# Common ruff settings
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "venv",
+]
+
+line-length = 100
+
+[tool.ruff.lint]
+# Enable Pyflakes (`F`), pycodestyle (`E`, `W`), isort (`I`), and flake8-bugbear (`B`)
+select = ["F", "E", "W", "I", "B"]
+ignore = []
+
+# Allow autofix for all enabled rules (when `--fix` is provided).
+fixable = ["ALL"]
+unfixable = []
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+"tests/verify_installation.py" = ["F401"]
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = false
+warn_unused_configs = true
+disallow_untyped_defs = false
+check_untyped_defs = false
+ignore_missing_imports = true
+follow_imports = "silent"
+exclude = [
+    "venv",
+    "build",
+    "dist",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/katzmatt/TracerTemplateMaker"
+"Bug Tracker" = "https://github.com/katzmatt/TracerTemplateMaker/issues"
+
+[project.scripts]
+tracertemplatemaker = "main:main"
+tracertemplatemaker-test = "tests.run_tests:run_tests"
+
+[tool.setuptools]
+py-modules = ["main"]
+packages = ["modules", "tests"]

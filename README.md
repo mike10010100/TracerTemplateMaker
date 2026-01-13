@@ -62,7 +62,7 @@ Whether you need to digitize vintage templates, create duplicates, or modify exi
 4. **Install dependencies**
    ```bash
    pip install --upgrade pip
-   pip install -r requirements.txt
+   pip install .
    ```
 
 5. **Run the application**
@@ -188,17 +188,13 @@ The application automatically handles:
 
 ### Architecture
 
+AI coding agents should refer to [AGENTS.md](AGENTS.md) for detailed project context and coding standards.
+
 ```
 TracerTemplateMaker/
 ├── main.py                      # Main application & UI
+├── AGENTS.md                    # Instructions for AI assistants
 ├── modules/
-│   ├── image_processor.py       # Image processing & layer separation
-│   ├── svg_generator.py         # SVG export with layers
-│   ├── stl_generator.py         # 3D mesh & STL export
-│   └── ui_components.py         # Reusable UI widgets
-├── Examples/                    # Sample templates
-├── requirements.txt             # Python dependencies
-└── CHANGELOG.md                 # Version history
 ```
 
 ### Dependencies
@@ -250,7 +246,7 @@ The application maintains pixel-to-millimeter scaling throughout the entire pipe
 
 **Issue: Application won't start**
 - Ensure virtual environment is activated: `(venv)` appears in terminal
-- Reinstall dependencies: `pip install -r requirements.txt`
+- Reinstall dependencies: `pip install .`
 - Check Python version: `python --version` (needs 3.8+)
 
 ### Getting Better Results
@@ -264,9 +260,12 @@ The application maintains pixel-to-millimeter scaling throughout the entire pipe
 
 ## Version History
 
-### Current Version: 1.6.0 (2026-01-12)
+### Current Version: 1.6.1 (2026-01-12)
 
 **Major Features:**
+- ⚡ **Asynchronous UI**: Processing and 3D previews now run in the background.
+- ⏱️ **Debounced Inputs**: Smoother experience when adjusting sliders.
+- 🖱️ **Scroll Protection**: Prevented mouse wheel from accidentally changing slider values.
 - 🎯 Independent Profile and Text layer controls
 - 🎨 Eyedropper tool for accurate color selection
 - 🖼️ 3D STL preview feature

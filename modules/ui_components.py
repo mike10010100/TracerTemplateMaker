@@ -408,6 +408,18 @@ class ControlPanel(QWidget):
         """Emit text detail level changed signal."""
         self.text_detail_changed.emit(value)
 
+    def set_values(self, values: dict):
+        """
+        Update all sliders with provided values.
+        
+        Args:
+            values: Dictionary of {label: value}
+        """
+        for label, value in values.items():
+            if label in self.sliders:
+                slider, _ = self.sliders[label]
+                slider.setValue(value)
+
     def reset_values(self):
         """Reset all sliders to default values."""
         for slider, default in self.sliders.values():

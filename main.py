@@ -25,6 +25,8 @@ from modules.stl_generator import STLGenerator
 from modules.ui_components import (ImagePreviewWidget, ControlPanel,
                                    DimensionInputPanel, ColorPickerPanel,
                                    NoWheelDoubleSpinBox)
+from modules.config import ConfigManager
+from modules.app_state import AppState
 
 
 class ProcessingThread(QThread):
@@ -56,39 +58,22 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
+        # Initialize config and state
+        self.config_manager = ConfigManager()
+        self.state = AppState()
+        self.state.load_from_dict(self.config_manager.settings)
+
         # Initialize processors
         self.image_processor = ImageProcessor()
         self.svg_generator = None
         self.stl_generator = None
 
         # Current processing state
-        self.current_image_path = None
         self.processed_image = None
         self.profile_mask = None
         self.text_mask = None
         self.svg_path = None
         self.is_processing = False
-
-        # Processing parameters (apply to whole image)
-        self.contrast = 1.0
-        self.brightness = 1.0
-        self.sharpness = 1.0
-        self.blur_kernel = 0
-
-        # Profile layer parameters
-        self.profile_threshold = 200
-        self.profile_tolerance = 30
-        self.profile_smoothing = 5
-
-        # Text layer parameters
-        self.text_threshold = 127
-        self.text_tolerance = 30
-        self.text_detail = 2
-
-        # Colors
-        self.bg_color = (255, 255, 255)    # Background/void color - white (BGR)
-        self.tracer_color = (0, 255, 255)  # Tracer card color - yellow (BGR)
-        self.text_color = (0, 0, 0)        # Text/line color - black (BGR)
 
         # Eyedropper mode
         self.eyedropper_active = False
@@ -101,6 +86,45 @@ class MainWindow(QMainWindow):
         self.process_timer.timeout.connect(self.start_processing_thread)
 
         self.init_ui()
+        self.apply_state_to_ui()
+
+    def closeEvent(self, event):
+        """Save settings when the application is closed."""
+        self.config_manager.save_settings(self.state.to_dict())
+        event.accept()
+
+    def apply_state_to_ui(self):
+        """Update the UI widgets with values from the current state."""
+        # Update Dimensions
+        self.dimension_panel.width_input.setValue(self.state.width_mm)
+        self.dimension_panel.height_input.setValue(self.state.height_mm)
+
+        # Update Colors
+        self.color_panel.bg_color = self.state.bg_color
+        self.color_panel.update_button_color(self.color_panel.bg_color_btn, 
+                                           (self.state.bg_color[2], self.state.bg_color[1], self.state.bg_color[0]))
+        
+        self.color_panel.tracer_color = self.state.tracer_color
+        self.color_panel.update_button_color(self.color_panel.tracer_color_btn, 
+                                           (self.state.tracer_color[2], self.state.tracer_color[1], self.state.tracer_color[0]))
+        
+        self.color_panel.text_color = self.state.text_color
+        self.color_panel.update_button_color(self.color_panel.text_color_btn, 
+                                           (self.state.text_color[2], self.state.text_color[1], self.state.text_color[0]))
+
+        # Update Sliders (ControlPanel needs a set_values method, we'll add it)
+        self.control_panel.set_values({
+            "Contrast": int(self.state.contrast * 100),
+            "Brightness": int(self.state.brightness * 100),
+            "Sharpness": int(self.state.sharpness * 100),
+            "Blur (Noise Reduction)": (self.state.blur_kernel - 1) // 2 if self.state.blur_kernel > 0 else 0,
+            "Profile Threshold": self.state.profile_threshold,
+            "Profile Color Tolerance": self.state.profile_tolerance,
+            "Profile Smoothing": self.state.profile_smoothing,
+            "Text Threshold": self.state.text_threshold,
+            "Text Color Tolerance": self.state.text_tolerance,
+            "Text Detail Level": self.state.text_detail
+        })
 
     def init_ui(self):
         """Initialize the user interface."""
@@ -244,7 +268,7 @@ class MainWindow(QMainWindow):
 
         if file_path:
             try:
-                self.current_image_path = file_path
+                self.state.current_image_path = file_path
                 image = self.image_processor.load_image(file_path)
 
                 # Display original
@@ -272,72 +296,75 @@ class MainWindow(QMainWindow):
 
     def on_dimensions_changed(self, width_mm: float, height_mm: float):
         """Handle dimension change."""
+        self.state.width_mm = width_mm
+        self.state.height_mm = height_mm
         self.image_processor.set_dimensions(width_mm, height_mm)
         self.statusBar().showMessage(f"Dimensions set: {width_mm}mm x {height_mm}mm")
 
     def on_contrast_changed(self, value: float):
         """Handle contrast change."""
-        self.contrast = value
+        self.state.contrast = value
         self.trigger_processing()
 
     def on_brightness_changed(self, value: float):
         """Handle brightness change."""
-        self.brightness = value
+        self.state.brightness = value
         self.trigger_processing()
 
     def on_sharpness_changed(self, value: float):
         """Handle sharpness change."""
-        self.sharpness = value
+        self.state.sharpness = value
         self.trigger_processing()
 
     def on_blur_changed(self, value: int):
         """Handle blur change."""
-        self.blur_kernel = value
+        self.state.blur_kernel = value
         self.trigger_processing()
 
     def on_profile_threshold_changed(self, value: int):
         """Handle profile threshold change."""
-        self.profile_threshold = value
+        self.state.profile_threshold = value
         self.trigger_processing()
 
     def on_text_threshold_changed(self, value: int):
         """Handle text threshold change."""
-        self.text_threshold = value
+        self.state.text_threshold = value
         self.trigger_processing()
 
     def on_profile_tolerance_changed(self, value: int):
         """Handle profile color tolerance change."""
-        self.profile_tolerance = value
+        self.state.profile_tolerance = value
         self.trigger_processing()
 
     def on_profile_smoothing_changed(self, value: int):
         """Handle profile smoothing change."""
-        self.profile_smoothing = value
+        self.state.profile_smoothing = value
         self.trigger_processing()
 
     def on_text_tolerance_changed(self, value: int):
         """Handle text color tolerance change."""
-        self.text_tolerance = value
+        self.text_tolerance = value # Wait, I should use self.state.text_tolerance
+        self.state.text_tolerance = value
         self.trigger_processing()
 
     def on_text_detail_changed(self, value: int):
         """Handle text detail level change."""
-        self.text_detail = value
+        self.state.text_detail = value
         self.trigger_processing()
 
     def on_bg_color_changed(self, color: tuple):
         """Handle background/void color change."""
-        self.bg_color = color
+        self.state.bg_color = color
         self.trigger_processing()
 
     def on_tracer_color_changed(self, color: tuple):
         """Handle tracer card color change."""
-        self.tracer_color = color
+        self.state.tracer_color = color
         self.trigger_processing()
 
     def on_text_color_changed(self, color: tuple):
         """Handle text/line color change."""
-        self.text_color = color
+        self.state.text_color = color
         self.trigger_processing()
 
     def activate_eyedropper(self, target: str):
@@ -411,29 +438,24 @@ class MainWindow(QMainWindow):
             return
 
         # If already processing, the timer will just fire again later
-        # But we can also cancel the previous thread if needed, or just wait
-        # For simplicity, we'll just let it run but indicate we are busy
-        # Ideally, we should cancel the previous thread if it's stale, but QThread doesn't support safe cancellation easily.
-        # So we just fire a new one. The UI will update with the latest result.
-        
         self.is_processing = True
         self.statusBar().showMessage("Processing...")
         
-        # Collect all current parameters
+        # Collect all current parameters from self.state
         params = {
-            'contrast': self.contrast,
-            'brightness': self.brightness,
-            'sharpness': self.sharpness,
-            'blur_kernel': self.blur_kernel,
-            'bg_color': self.bg_color,
-            'tracer_color': self.tracer_color,
-            'text_color': self.text_color,
-            'profile_tolerance': self.profile_tolerance,
-            'profile_threshold': self.profile_threshold,
-            'profile_smoothing': self.profile_smoothing,
-            'text_tolerance': self.text_tolerance,
-            'text_threshold': self.text_threshold,
-            'text_detail': self.text_detail
+            'contrast': self.state.contrast,
+            'brightness': self.state.brightness,
+            'sharpness': self.state.sharpness,
+            'blur_kernel': self.state.blur_kernel,
+            'bg_color': self.state.bg_color,
+            'tracer_color': self.state.tracer_color,
+            'text_color': self.state.text_color,
+            'profile_tolerance': self.state.profile_tolerance,
+            'profile_threshold': self.state.profile_threshold,
+            'profile_smoothing': self.state.profile_smoothing,
+            'text_tolerance': self.state.text_tolerance,
+            'text_threshold': self.state.text_threshold,
+            'text_detail': self.state.text_detail
         }
 
         # Create thread

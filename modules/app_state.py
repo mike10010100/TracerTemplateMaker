@@ -4,41 +4,41 @@ Application State Module for TracerTemplateMaker
 Manages the current runtime state of the application, decoupling data from UI.
 """
 
-from dataclasses import dataclass, field
-from typing import Tuple, Optional
-import numpy as np
+from dataclasses import dataclass
+from typing import Optional, Tuple
+
 
 @dataclass
 class AppState:
     """Holds the current state of the application's processing parameters."""
-    
+
     # Image Paths
     current_image_path: Optional[str] = None
-    
+
     # Processing Parameters
     contrast: float = 1.0
     brightness: float = 1.0
     sharpness: float = 1.0
     blur_kernel: int = 0
-    
+
     # Layer Parameters
     profile_threshold: int = 200
     profile_tolerance: int = 30
     profile_smoothing: int = 5
-    
+
     text_threshold: int = 127
     text_tolerance: int = 30
     text_detail: int = 2
-    
+
     # Colors (BGR)
     bg_color: Tuple[int, int, int] = (255, 255, 255)
     tracer_color: Tuple[int, int, int] = (0, 255, 255)
     text_color: Tuple[int, int, int] = (0, 0, 0)
-    
+
     # Dimensions
     width_mm: float = 100.0
     height_mm: float = 50.0
-    
+
     # STL Options
     thickness: float = 2.0
     separate_text: bool = False
@@ -62,7 +62,7 @@ class AppState:
             "thickness": self.thickness,
             "separate_text": self.separate_text,
             "last_width": self.width_mm,
-            "last_height": self.height_mm
+            "last_height": self.height_mm,
         }
 
     def load_from_dict(self, data: dict):
@@ -77,12 +77,15 @@ class AppState:
         self.text_threshold = data.get("text_threshold", 127)
         self.text_tolerance = data.get("text_tolerance", 30)
         self.text_detail = data.get("text_detail", 2)
-        
+
         # Colors need to be converted to tuples
-        if "bg_color" in data: self.bg_color = tuple(data["bg_color"])
-        if "tracer_color" in data: self.tracer_color = tuple(data["tracer_color"])
-        if "text_color" in data: self.text_color = tuple(data["text_color"])
-        
+        if "bg_color" in data:
+            self.bg_color = tuple(data["bg_color"])
+        if "tracer_color" in data:
+            self.tracer_color = tuple(data["tracer_color"])
+        if "text_color" in data:
+            self.text_color = tuple(data["text_color"])
+
         self.thickness = data.get("thickness", 2.0)
         self.separate_text = data.get("separate_text", False)
         self.width_mm = data.get("last_width", 100.0)

@@ -9,27 +9,27 @@ import os
 import sys
 from logging.handlers import RotatingFileHandler
 
+
 def setup_logger(name="TracerTemplateMaker"):
     """
     Configure and return a logger instance.
-    
+
     Args:
         name: Logger name
-        
+
     Returns:
         logging.Logger: Configured logger
     """
     logger = logging.getLogger(name)
     logger.setLevel(logging.INFO)
-    
+
     # Check if handlers are already added to avoid duplicates
     if logger.handlers:
         return logger
 
     # Create formatter
     formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
     )
 
     # Console Handler
@@ -49,10 +49,10 @@ def setup_logger(name="TracerTemplateMaker"):
                 os.makedirs(log_dir)
 
     log_file = os.path.join(log_dir, "app.log")
-    
+
     # Rotating file handler (max 1MB, keep 3 backups)
     file_handler = RotatingFileHandler(
-        log_file, maxBytes=1024*1024, backupCount=3, encoding='utf-8'
+        log_file, maxBytes=1024 * 1024, backupCount=3, encoding="utf-8"
     )
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)

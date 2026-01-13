@@ -29,15 +29,67 @@ classifiers = [
 dependencies = [
     "opencv-python>=4.8.0",
     "numpy>=1.24.0",
-    "Pillow>=10.0.0",
     "svgwrite>=1.4.3",
-    "numpy-stl>=3.0.0",
     "trimesh>=4.0.0",
     "shapely>=2.0.0",
-    "mapbox-earcut>=2.0.0",
-    "PyQt6>=6.5.0",
     "matplotlib>=3.7.0",
-    "scikit-image>=0.21.0",
+    "Pillow>=10.0.0",
+    "scipy>=1.10.0",
+]
+
+[tool.ruff]
+# Common ruff settings
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "venv",
+]
+
+line-length = 100
+
+[tool.ruff.lint]
+# Enable Pyflakes (`F`), pycodestyle (`E`, `W`), isort (`I`), and flake8-bugbear (`B`)
+select = ["F", "E", "W", "I", "B"]
+ignore = []
+
+# Allow autofix for all enabled rules (when `--fix` is provided).
+fixable = ["ALL"]
+unfixable = []
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+"tests/verify_installation.py" = ["F401"]
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = false
+warn_unused_configs = true
+disallow_untyped_defs = false
+check_untyped_defs = false
+ignore_missing_imports = true
+follow_imports = "silent"
+exclude = [
+    "venv",
+    "build",
+    "dist",
 ]
 
 [project.urls]

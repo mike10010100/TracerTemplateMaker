@@ -8,29 +8,50 @@ This module contains reusable UI components:
 - File dialogs
 """
 
-from PyQt6.QtWidgets import (QWidget, QLabel, QSlider, QPushButton, QVBoxLayout,
-                             QHBoxLayout, QFileDialog, QGroupBox, QSpinBox,
-                             QDoubleSpinBox, QColorDialog, QFrame, QScrollArea)
-from PyQt6.QtCore import Qt, pyqtSignal, QPoint, QPointF
-from PyQt6.QtGui import QPixmap, QImage, QPainter, QColor, QPen, QWheelEvent, QMouseEvent, QCursor
 import numpy as np
-import cv2
+from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QCursor, QImage, QMouseEvent, QPixmap, QWheelEvent
+from PyQt6.QtWidgets import (
+    QColorDialog,
+    QDoubleSpinBox,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QScrollArea,
+    QSlider,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
+)
 
 
 class NoWheelSlider(QSlider):
-    """QSlider that ignores mouse wheel events to prevent accidental adjustments during scrolling."""
+    """
+
+
+    QSlider that ignores mouse wheel events to prevent accidental
+
+
+    adjustments during scrolling.
+
+
+    """
+
     def wheelEvent(self, event):
         event.ignore()
 
 
 class NoWheelSpinBox(QSpinBox):
     """QSpinBox that ignores mouse wheel events."""
+
     def wheelEvent(self, event):
         event.ignore()
 
 
 class NoWheelDoubleSpinBox(QDoubleSpinBox):
     """QDoubleSpinBox that ignores mouse wheel events."""
+
     def wheelEvent(self, event):
         event.ignore()
 
@@ -39,7 +60,7 @@ class ImagePreviewWidget(QWidget):
     """
     Widget for displaying images with pan and zoom capabilities.
     """
-    
+
     # Signal emitted when view changes (zoom, h_scroll, v_scroll)
     view_changed = pyqtSignal(float, int, int)
 
@@ -91,10 +112,10 @@ class ImagePreviewWidget(QWidget):
         if abs(self.zoom_level - zoom) > 0.001:
             self.zoom_level = zoom
             update_needed = True
-        
+
         if update_needed:
             self.update_display()
-            
+
         self.scroll_area.horizontalScrollBar().setValue(h_scroll)
         self.scroll_area.verticalScrollBar().setValue(v_scroll)
 
@@ -117,13 +138,15 @@ class ImagePreviewWidget(QWidget):
         if len(self.image.shape) == 3:
             height, width, channel = self.image.shape
             bytes_per_line = 3 * width
-            q_image = QImage(self.image.data, width, height, bytes_per_line,
-                           QImage.Format.Format_RGB888).rgbSwapped()
+            q_image = QImage(
+                self.image.data, width, height, bytes_per_line, QImage.Format.Format_RGB888
+            ).rgbSwapped()
         else:
             height, width = self.image.shape
             bytes_per_line = width
-            q_image = QImage(self.image.data, width, height, bytes_per_line,
-                           QImage.Format.Format_Grayscale8)
+            q_image = QImage(
+                self.image.data, width, height, bytes_per_line, QImage.Format.Format_Grayscale8
+            )
 
         # Apply zoom
         pixmap = QPixmap.fromImage(q_image)
@@ -131,7 +154,7 @@ class ImagePreviewWidget(QWidget):
             int(pixmap.width() * self.zoom_level),
             int(pixmap.height() * self.zoom_level),
             Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation
+            Qt.TransformationMode.SmoothTransformation,
         )
 
         # Set the pixmap and resize label to match
@@ -161,7 +184,7 @@ class ImagePreviewWidget(QWidget):
             v_bar.setValue(v_bar.value() - delta.y())
 
             self.last_mouse_pos = current_pos
-            
+
             # Emit signal
             self.view_changed.emit(self.zoom_level, h_bar.value(), v_bar.value())
         else:
@@ -201,7 +224,7 @@ class ImagePreviewWidget(QWidget):
             self.image_label.setCursor(QCursor(Qt.CursorShape.OpenHandCursor))
         else:
             self.image_label.setCursor(QCursor(Qt.CursorShape.ArrowCursor))
-            
+
         # Emit signal
         h_bar = self.scroll_area.horizontalScrollBar()
         v_bar = self.scroll_area.verticalScrollBar()
@@ -251,34 +274,24 @@ class ControlPanel(QWidget):
         layout = QVBoxLayout()
 
         # Contrast control
-        contrast_group = self.create_slider_group(
-            "Contrast",
-            0, 300, 100,
-            self.on_contrast_changed
-        )
+        contrast_group = self.create_slider_group("Contrast", 0, 300, 100, self.on_contrast_changed)
         layout.addWidget(contrast_group)
 
         # Brightness control
         brightness_group = self.create_slider_group(
-            "Brightness",
-            0, 300, 100,
-            self.on_brightness_changed
+            "Brightness", 0, 300, 100, self.on_brightness_changed
         )
         layout.addWidget(brightness_group)
 
         # Sharpness control
         sharpness_group = self.create_slider_group(
-            "Sharpness",
-            0, 300, 100,
-            self.on_sharpness_changed
+            "Sharpness", 0, 300, 100, self.on_sharpness_changed
         )
         layout.addWidget(sharpness_group)
 
         # Blur control
         blur_group = self.create_slider_group(
-            "Blur (Noise Reduction)",
-            0, 15, 0,
-            self.on_blur_changed
+            "Blur (Noise Reduction)", 0, 15, 0, self.on_blur_changed
         )
         layout.addWidget(blur_group)
 
@@ -288,24 +301,22 @@ class ControlPanel(QWidget):
         # Profile Threshold control
         profile_threshold_group = self.create_slider_group(
             "Profile Threshold",
-            0, 255, 200,  # Higher default for better hole detection
-            self.on_profile_threshold_changed
+            0,
+            255,
+            200,  # Higher default for better hole detection
+            self.on_profile_threshold_changed,
         )
         layout.addWidget(profile_threshold_group)
 
         # Profile Color Tolerance
         profile_tolerance_group = self.create_slider_group(
-            "Profile Color Tolerance",
-            0, 100, 30,
-            self.on_profile_tolerance_changed
+            "Profile Color Tolerance", 0, 100, 30, self.on_profile_tolerance_changed
         )
         layout.addWidget(profile_tolerance_group)
 
         # Profile Smoothing
         profile_smoothing_group = self.create_slider_group(
-            "Profile Smoothing",
-            0, 10, 5,
-            self.on_profile_smoothing_changed
+            "Profile Smoothing", 0, 10, 5, self.on_profile_smoothing_changed
         )
         layout.addWidget(profile_smoothing_group)
 
@@ -315,24 +326,22 @@ class ControlPanel(QWidget):
         # Text Threshold control
         text_threshold_group = self.create_slider_group(
             "Text Threshold",
-            0, 255, 127,  # Standard middle value
-            self.on_text_threshold_changed
+            0,
+            255,
+            127,  # Standard middle value
+            self.on_text_threshold_changed,
         )
         layout.addWidget(text_threshold_group)
 
         # Text Color Tolerance
         text_tolerance_group = self.create_slider_group(
-            "Text Color Tolerance",
-            0, 100, 30,
-            self.on_text_tolerance_changed
+            "Text Color Tolerance", 0, 100, 30, self.on_text_tolerance_changed
         )
         layout.addWidget(text_tolerance_group)
 
         # Text Detail Preservation
         text_detail_group = self.create_slider_group(
-            "Text Detail Level",
-            0, 10, 2,
-            self.on_text_detail_changed
+            "Text Detail Level", 0, 10, 2, self.on_text_detail_changed
         )
         layout.addWidget(text_detail_group)
 
@@ -344,8 +353,9 @@ class ControlPanel(QWidget):
         layout.addStretch()
         self.setLayout(layout)
 
-    def create_slider_group(self, label: str, min_val: int, max_val: int,
-                           default: int, callback) -> QGroupBox:
+    def create_slider_group(
+        self, label: str, min_val: int, max_val: int, default: int, callback
+    ) -> QGroupBox:
         """
         Create a labeled slider group.
 
@@ -438,7 +448,7 @@ class ControlPanel(QWidget):
     def set_values(self, values: dict):
         """
         Update all sliders with provided values.
-        
+
         Args:
             values: Dictionary of {label: value}
         """
@@ -498,10 +508,7 @@ class DimensionInputPanel(QWidget):
 
     def emit_dimensions(self):
         """Emit dimension changed signal."""
-        self.dimensions_changed.emit(
-            self.width_input.value(),
-            self.height_input.value()
-        )
+        self.dimensions_changed.emit(self.width_input.value(), self.height_input.value())
 
     def get_dimensions(self) -> tuple:
         """Get current dimensions."""
@@ -514,9 +521,9 @@ class ColorPickerPanel(QWidget):
     """
 
     background_color_changed = pyqtSignal(tuple)  # Void/hole color
-    tracer_color_changed = pyqtSignal(tuple)      # Card color
-    text_color_changed = pyqtSignal(tuple)        # Text/line color
-    eyedropper_requested = pyqtSignal(str)        # Request eyedropper for specific color
+    tracer_color_changed = pyqtSignal(tuple)  # Card color
+    text_color_changed = pyqtSignal(tuple)  # Text/line color
+    eyedropper_requested = pyqtSignal(str)  # Request eyedropper for specific color
 
     def __init__(self, parent=None):
         """Initialize color picker panel."""
@@ -590,8 +597,7 @@ class ColorPickerPanel(QWidget):
         color = QColorDialog.getColor()
         if color.isValid():
             self.bg_color = (color.blue(), color.green(), color.red())  # BGR
-            self.update_button_color(self.bg_color_btn,
-                                    (color.red(), color.green(), color.blue()))
+            self.update_button_color(self.bg_color_btn, (color.red(), color.green(), color.blue()))
             self.background_color_changed.emit(self.bg_color)
 
     def pick_tracer_color(self):
@@ -599,8 +605,9 @@ class ColorPickerPanel(QWidget):
         color = QColorDialog.getColor()
         if color.isValid():
             self.tracer_color = (color.blue(), color.green(), color.red())  # BGR
-            self.update_button_color(self.tracer_color_btn,
-                                    (color.red(), color.green(), color.blue()))
+            self.update_button_color(
+                self.tracer_color_btn, (color.red(), color.green(), color.blue())
+            )
             self.tracer_color_changed.emit(self.tracer_color)
 
     def pick_text_color(self):
@@ -608,8 +615,9 @@ class ColorPickerPanel(QWidget):
         color = QColorDialog.getColor()
         if color.isValid():
             self.text_color = (color.blue(), color.green(), color.red())  # BGR
-            self.update_button_color(self.text_color_btn,
-                                    (color.red(), color.green(), color.blue()))
+            self.update_button_color(
+                self.text_color_btn, (color.red(), color.green(), color.blue())
+            )
             self.text_color_changed.emit(self.text_color)
 
     def get_colors(self) -> tuple:

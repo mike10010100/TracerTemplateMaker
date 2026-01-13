@@ -11,8 +11,8 @@ The core value proposition is **dimensional accuracy**, allowing makers to digit
 ### Key Technologies
 *   **Language:** Python 3.8+
 *   **GUI:** PyQt6
-*   **Image Processing:** OpenCV, Pillow, scikit-image
-*   **Vector/3D Generation:** svgwrite, trimesh, numpy-stl, shapely
+*   **Image Processing:** OpenCV, Pillow
+*   **Vector/3D Generation:** svgwrite, trimesh, shapely
 *   **Visualization:** Matplotlib (Poly3DCollection for artifact-free previews)
 *   **Packaging:** setuptools, pyproject.toml
 

@@ -4,9 +4,10 @@ Configuration Management Module for TracerTemplateMaker
 Handles default settings, constants, and persistence of user preferences.
 """
 
-import os
 import json
-from typing import Dict, Any
+import os
+from typing import Any, Dict
+
 from modules.logger import setup_logger
 
 logger = setup_logger("Config")
@@ -28,18 +29,19 @@ DEFAULTS = {
     "text_threshold": 127,
     "text_tolerance": 30,
     "text_detail": 2,
-    "bg_color": [255, 255, 255],    # BGR
+    "bg_color": [255, 255, 255],  # BGR
     "tracer_color": [0, 255, 255],  # BGR
-    "text_color": [0, 0, 0],        # BGR
+    "text_color": [0, 0, 0],  # BGR
     "thickness": 2.0,
     "separate_text": False,
     "last_width": 100.0,
-    "last_height": 50.0
+    "last_height": 50.0,
 }
+
 
 class ConfigManager:
     """Handles loading and saving of user configuration."""
-    
+
     def __init__(self):
         self.config_dir = os.path.join(os.path.expanduser("~"), ".tracertemplatemaker")
         self.config_path = os.path.join(self.config_dir, "settings.json")
@@ -50,7 +52,7 @@ class ConfigManager:
         """Load settings from JSON file."""
         if os.path.exists(self.config_path):
             try:
-                with open(self.config_path, 'r') as f:
+                with open(self.config_path, "r") as f:
                     user_settings = json.load(f)
                     # Update defaults with user settings (prevents issues with new keys)
                     self.settings.update(user_settings)
@@ -60,12 +62,12 @@ class ConfigManager:
     def save_settings(self, current_settings: Dict[str, Any]):
         """Save current settings to JSON file."""
         self.settings.update(current_settings)
-        
+
         if not os.path.exists(self.config_dir):
             os.makedirs(self.config_dir)
-            
+
         try:
-            with open(self.config_path, 'w') as f:
+            with open(self.config_path, "w") as f:
                 json.dump(self.settings, f, indent=4)
         except Exception as e:
             logger.error(f"Error saving settings: {e}")

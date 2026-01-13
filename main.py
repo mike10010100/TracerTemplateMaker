@@ -563,6 +563,7 @@ class STLGeneratorDialog(QDialog):
         self.profile_mask = profile_mask
         self.text_mask = text_mask
         self.width_mm, self.height_mm = dimensions
+        self.is_processing = False
 
         self.init_ui()
 
@@ -646,128 +647,146 @@ class STLGeneratorDialog(QDialog):
         self.preview_mesh = None
 
     def update_preview(self):
-        """Generate and display 3D preview of the STL."""
-        try:
-            import matplotlib
-            matplotlib.use('Agg')  # Non-interactive backend
-            import matplotlib.pyplot as plt
-            from mpl_toolkits.mplot3d import Axes3D
-            from io import BytesIO
+        """Start background thread to generate 3D preview."""
+        if self.is_processing:
+            return
 
-            self.preview_label.setText("Generating preview...")
-            QApplication.processEvents()  # Update UI
+        self.preview_label.setText("Generating preview...")
+        self.is_processing = True
+        
+        # Collect params
+        params = {
+            'width_mm': self.width_mm,
+            'height_mm': self.height_mm,
+            'profile_mask': self.profile_mask,
+            'text_mask': self.text_mask,
+            'thickness': self.thickness_input.value(),
+            'separate_text': self.separate_text_check.isChecked()
+        }
+        
+        self.thread = ProcessingThread(self.generate_preview_data, **params)
+        self.thread.finished.connect(self.on_preview_finished)
+        self.thread.error.connect(self.on_preview_error)
+        self.thread.start()
 
-            # Create STL generator
-            stl_gen = STLGenerator(self.width_mm, self.height_mm)
+    @staticmethod
+    def generate_preview_data(width_mm, height_mm, profile_mask, text_mask, thickness, separate_text):
+        """Generate preview image data in background."""
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+        from mpl_toolkits.mplot3d import Axes3D
+        from io import BytesIO
+        import trimesh
+        import numpy as np
 
-            # Prepare masks
-            inverted_profile = cv2.bitwise_not(self.profile_mask)
-            thickness = self.thickness_input.value()
-            separate_text = self.separate_text_check.isChecked()
+        # Create STL generator
+        stl_gen = STLGenerator(width_mm, height_mm)
 
-            # Generate meshes
-            if separate_text and self.text_mask is not None:
-                # Create dual layer
-                text_height = 0.2
-                base_mesh = stl_gen.extrude_mask_to_mesh(inverted_profile, thickness, 0.0)
-                text_mesh = stl_gen.extrude_mask_to_mesh(self.text_mask, text_height, thickness)
+        # Prepare masks
+        inverted_profile = cv2.bitwise_not(profile_mask)
 
-                if len(text_mesh.vertices) > 0:
-                    import trimesh
-                    combined_mesh = trimesh.util.concatenate([base_mesh, text_mesh])
-                else:
-                    combined_mesh = base_mesh
+        # Generate meshes
+        if separate_text and text_mask is not None:
+            # Create dual layer
+            text_height = 0.2
+            base_mesh = stl_gen.extrude_mask_to_mesh(inverted_profile, thickness, 0.0)
+            text_mesh = stl_gen.extrude_mask_to_mesh(text_mask, text_height, thickness)
 
-                # Apply the same transformation as in create_dual_layer_stl
-                import numpy as np
-                # Mirror flip on Y-axis (same as STL generation)
-                mirror_matrix = np.array([
-                    [1, 0, 0, 0],   # Keep X
-                    [0, 1, 0, 0],   # Keep Y
-                    [0, 0, -1, 0],  # Flip Z
-                    [0, 0, 0, 1]
-                ])
-                combined_mesh.apply_transform(mirror_matrix)
-                min_z = combined_mesh.bounds[0][2]
-                if min_z < 0:
-                    combined_mesh.apply_translation([0, 0, -min_z])
-
-                self.preview_mesh = combined_mesh
+            if len(text_mesh.vertices) > 0:
+                combined_mesh = trimesh.util.concatenate([base_mesh, text_mesh])
             else:
-                # Simple mesh
-                if self.text_mask is not None:
-                    combined_mask = cv2.bitwise_or(inverted_profile, self.text_mask)
-                else:
-                    combined_mask = inverted_profile
-                self.preview_mesh = stl_gen.extrude_mask_to_mesh(combined_mask, thickness, 0.0)
+                combined_mesh = base_mesh
 
-            # Check if mesh is valid
-            if len(self.preview_mesh.vertices) == 0 or len(self.preview_mesh.faces) == 0:
-                self.preview_label.setText("Preview failed: No geometry generated.\nCheck that your masks have content.")
-                return
+            # Apply transform
+            mirror_matrix = np.array([
+                [1, 0, 0, 0],   # Keep X
+                [0, 1, 0, 0],   # Keep Y
+                [0, 0, -1, 0],  # Flip Z
+                [0, 0, 0, 1]
+            ])
+            combined_mesh.apply_transform(mirror_matrix)
+            min_z = combined_mesh.bounds[0][2]
+            if min_z < 0:
+                combined_mesh.apply_translation([0, 0, -min_z])
+            
+            mesh_to_render = combined_mesh
+        else:
+            # Simple mesh
+            if text_mask is not None:
+                combined_mask = cv2.bitwise_or(inverted_profile, text_mask)
+            else:
+                combined_mask = inverted_profile
+            mesh_to_render = stl_gen.extrude_mask_to_mesh(combined_mask, thickness, 0.0)
 
-            # Render mesh to image
-            fig = plt.figure(figsize=(8, 6))
-            ax = fig.add_subplot(111, projection='3d')
+        # Check if mesh is valid
+        if len(mesh_to_render.vertices) == 0 or len(mesh_to_render.faces) == 0:
+            return None
 
-            # Plot the mesh
-            vertices = self.preview_mesh.vertices
-            faces = self.preview_mesh.faces
+        # Render mesh to image
+        fig = plt.figure(figsize=(8, 6))
+        ax = fig.add_subplot(111, projection='3d')
 
-            # Sample faces for faster rendering (if too many)
-            if len(faces) > 5000:
-                sample_indices = np.random.choice(len(faces), 5000, replace=False)
-                faces = faces[sample_indices]
+        # Plot the mesh
+        vertices = mesh_to_render.vertices
+        faces = mesh_to_render.faces
 
-            # Create 3D surface
-            from matplotlib.tri import Triangulation
-            x, y, z = vertices[:, 0], vertices[:, 1], vertices[:, 2]
-            ax.plot_trisurf(x, y, z, triangles=faces, cmap='viridis',
-                           alpha=0.8, edgecolor='none', shade=True)
+        # Sample faces for faster rendering
+        if len(faces) > 5000:
+            sample_indices = np.random.choice(len(faces), 5000, replace=False)
+            faces = faces[sample_indices]
 
-            # Set labels and view
-            ax.set_xlabel('X (mm)')
-            ax.set_ylabel('Y (mm)')
-            ax.set_zlabel('Z (mm)')
-            ax.set_title('STL Preview (Text side on top)')
+        x, y, z = vertices[:, 0], vertices[:, 1], vertices[:, 2]
+        ax.plot_trisurf(x, y, z, triangles=faces, cmap='viridis',
+                       alpha=0.8, edgecolor='none', shade=True)
 
-            # Set equal aspect ratio
-            max_range = np.array([vertices[:, 0].max() - vertices[:, 0].min(),
-                                 vertices[:, 1].max() - vertices[:, 1].min(),
-                                 vertices[:, 2].max() - vertices[:, 2].min()]).max() / 2.0
-            mid_x = (vertices[:, 0].max() + vertices[:, 0].min()) * 0.5
-            mid_y = (vertices[:, 1].max() + vertices[:, 1].min()) * 0.5
-            mid_z = (vertices[:, 2].max() + vertices[:, 2].min()) * 0.5
-            ax.set_xlim(mid_x - max_range, mid_x + max_range)
-            ax.set_ylim(mid_y - max_range, mid_y + max_range)
-            ax.set_zlim(mid_z - max_range, mid_z + max_range)
+        # Set labels and view
+        ax.set_xlabel('X (mm)')
+        ax.set_ylabel('Y (mm)')
+        ax.set_zlabel('Z (mm)')
+        ax.set_title('STL Preview (Text side on top)')
 
-            # View angle - looking down from above and slightly to the side
-            ax.view_init(elev=30, azim=45)
+        # Set equal aspect ratio
+        max_range = np.array([vertices[:, 0].max() - vertices[:, 0].min(),
+                             vertices[:, 1].max() - vertices[:, 1].min(),
+                             vertices[:, 2].max() - vertices[:, 2].min()]).max() / 2.0
+        mid_x = (vertices[:, 0].max() + vertices[:, 0].min()) * 0.5
+        mid_y = (vertices[:, 1].max() + vertices[:, 1].min()) * 0.5
+        mid_z = (vertices[:, 2].max() + vertices[:, 2].min()) * 0.5
+        ax.set_xlim(mid_x - max_range, mid_x + max_range)
+        ax.set_ylim(mid_y - max_range, mid_y + max_range)
+        ax.set_zlim(mid_z - max_range, mid_z + max_range)
 
-            # Save to buffer
-            buf = BytesIO()
-            plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')
-            buf.seek(0)
-            plt.close(fig)
+        ax.view_init(elev=30, azim=45)
 
-            # Display in label
-            pixmap = QPixmap()
-            pixmap.loadFromData(buf.read())
-            self.preview_label.setPixmap(pixmap.scaled(
-                self.preview_label.size(),
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation
-            ))
+        # Save to buffer
+        buf = BytesIO()
+        plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')
+        buf.seek(0)
+        plt.close(fig)
+        
+        return buf.read()
 
-        except ImportError as e:
-            self.preview_label.setText(f"Preview requires matplotlib.\nPlease install: pip install matplotlib>=3.7.0\n\nError: {str(e)}")
-            print(f"Import error in preview: {e}")
-        except Exception as e:
-            self.preview_label.setText(f"Preview generation failed:\n{str(e)}\n\nCheck console for details.")
-            print(f"Preview error: {e}")
-            import traceback
-            traceback.print_exc()
+    def on_preview_finished(self, image_data):
+        """Handle preview generation success."""
+        self.is_processing = False
+        if image_data is None:
+            self.preview_label.setText("Preview failed: No geometry generated.\nCheck that your masks have content.")
+            return
+
+        pixmap = QPixmap()
+        pixmap.loadFromData(image_data)
+        self.preview_label.setPixmap(pixmap.scaled(
+            self.preview_label.size(),
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation
+        ))
+
+    def on_preview_error(self, error_msg):
+        """Handle preview generation error."""
+        self.is_processing = False
+        self.preview_label.setText(f"Preview generation failed:\n{error_msg}")
+        print(f"Preview error: {error_msg}")
 
     def generate_stl(self):
         """Generate STL file."""

@@ -728,9 +728,7 @@ class STLGeneratorDialog(QDialog):
         ax = fig.add_subplot(111, projection='3d')
         
         # Optimization: Simplify mesh if too large
-        is_point_cloud = False
-        TARGET_FACES = 5000
-        MAX_RENDER_FACES = 10000
+        TARGET_FACES = 10000
         
         if len(mesh_to_render.faces) > TARGET_FACES:
             try:
@@ -738,25 +736,19 @@ class STLGeneratorDialog(QDialog):
                 mesh_to_render = mesh_to_render.simplify_quadric_decimation(TARGET_FACES)
             except Exception:
                 # Simplification failed (likely missing dependencies)
+                # We will render the full mesh (might be slow, but accurate)
                 pass
         
-        # Decision: Surface render or Point Cloud?
-        if len(mesh_to_render.faces) > MAX_RENDER_FACES:
-            # Too many faces for plot_trisurf to handle efficiently
-            is_point_cloud = True
-            # Sample points for point cloud
-            points = mesh_to_render.sample(5000)
-            x, y, z = points[:, 0], points[:, 1], points[:, 2]
-            ax.scatter(x, y, z, s=1, c='gray', alpha=0.5)
-            title = 'STL Preview (Point Cloud - High Detail)'
-        else:
-            # Render surface
-            vertices = mesh_to_render.vertices
-            faces = mesh_to_render.faces
-            x, y, z = vertices[:, 0], vertices[:, 1], vertices[:, 2]
-            ax.plot_trisurf(x, y, z, triangles=faces, cmap='viridis',
-                           alpha=0.8, edgecolor='none', shade=True)
-            title = 'STL Preview (Text side on top)'
+        # Render surface
+        vertices = mesh_to_render.vertices
+        faces = mesh_to_render.faces
+        x, y, z = vertices[:, 0], vertices[:, 1], vertices[:, 2]
+        
+        # Note: plot_trisurf can be slow for large meshes (>20k faces)
+        # but since we are in a background thread, we prioritize quality over speed.
+        ax.plot_trisurf(x, y, z, triangles=faces, cmap='viridis',
+                       alpha=0.8, edgecolor='none', shade=True)
+        title = 'STL Preview (Text side on top)'
 
         # Set labels and view
         ax.set_xlabel('X (mm)')
@@ -765,13 +757,8 @@ class STLGeneratorDialog(QDialog):
         ax.set_title(title)
 
         # Set equal aspect ratio
-        if is_point_cloud:
-             # Use points for bounds
-             bounds_min = points.min(axis=0)
-             bounds_max = points.max(axis=0)
-        else:
-             bounds_min = mesh_to_render.bounds[0]
-             bounds_max = mesh_to_render.bounds[1]
+        bounds_min = mesh_to_render.bounds[0]
+        bounds_max = mesh_to_render.bounds[1]
 
         max_range = (bounds_max - bounds_min).max() / 2.0
         mid = (bounds_max + bounds_min) * 0.5

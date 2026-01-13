@@ -264,9 +264,12 @@ The application maintains pixel-to-millimeter scaling throughout the entire pipe
 
 ## Version History
 
-### Current Version: 1.6.0 (2026-01-12)
+### Current Version: 1.6.1 (2026-01-12)
 
 **Major Features:**
+- ⚡ **Asynchronous UI**: Processing and 3D previews now run in the background.
+- ⏱️ **Debounced Inputs**: Smoother experience when adjusting sliders.
+- 🖱️ **Scroll Protection**: Prevented mouse wheel from accidentally changing slider values.
 - 🎯 Independent Profile and Text layer controls
 - 🎨 Eyedropper tool for accurate color selection
 - 🖼️ 3D STL preview feature

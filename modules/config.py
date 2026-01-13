@@ -7,6 +7,9 @@ Handles default settings, constants, and persistence of user preferences.
 import os
 import json
 from typing import Dict, Any
+from modules.logger import setup_logger
+
+logger = setup_logger("Config")
 
 # Application Constants
 APP_NAME = "TracerTemplateMaker"
@@ -52,7 +55,7 @@ class ConfigManager:
                     # Update defaults with user settings (prevents issues with new keys)
                     self.settings.update(user_settings)
             except Exception as e:
-                print(f"Error loading settings: {e}")
+                logger.error(f"Error loading settings: {e}")
 
     def save_settings(self, current_settings: Dict[str, Any]):
         """Save current settings to JSON file."""
@@ -65,7 +68,7 @@ class ConfigManager:
             with open(self.config_path, 'w') as f:
                 json.dump(self.settings, f, indent=4)
         except Exception as e:
-            print(f"Error saving settings: {e}")
+            logger.error(f"Error saving settings: {e}")
 
     def get(self, key: str) -> Any:
         """Get a setting value."""

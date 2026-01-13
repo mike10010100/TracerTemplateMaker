@@ -13,6 +13,9 @@ from stl import mesh
 import cv2
 from typing import List, Tuple, Optional
 import trimesh
+from modules.logger import setup_logger
+
+logger = setup_logger("STLGenerator")
 
 
 class STLGenerator:
@@ -84,7 +87,7 @@ class STLGenerator:
 
         # If too many contours, keep only the largest ones
         if len(contour_data) > MAX_CONTOURS:
-            print(f"Warning: Too many contours ({len(contour_data)}), limiting to {MAX_CONTOURS}")
+            logger.warning(f"Too many contours ({len(contour_data)}), limiting to {MAX_CONTOURS}")
             # Sort by area and keep largest
             contour_data.sort(key=lambda x: x[2], reverse=True)
             contour_data = contour_data[:MAX_CONTOURS]
@@ -94,9 +97,9 @@ class STLGenerator:
             temp_mask = np.zeros_like(binary_mask)
             cv2.drawContours(temp_mask, filtered_contours, -1, 255, -1)
             contours, hierarchy = cv2.findContours(temp_mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
-            print(f"Reduced to {len(contours)} contours after filtering")
+            logger.info(f"Reduced to {len(contours)} contours after filtering")
         elif len(contour_data) < len(contours):
-            print(f"Filtered out {len(contours) - len(contour_data)} tiny contours (noise)")
+            logger.info(f"Filtered out {len(contours) - len(contour_data)} tiny contours (noise)")
             filtered_contours = [c for _, c, _ in contour_data]
             temp_mask = np.zeros_like(binary_mask)
             cv2.drawContours(temp_mask, filtered_contours, -1, 255, -1)
@@ -138,7 +141,7 @@ class STLGenerator:
                 # Safety check: Skip polygons with too many vertices (potential hang)
                 MAX_VERTICES = 5000
                 if len(outer_polygon) > MAX_VERTICES:
-                    print(f"Warning: Contour {idx} has too many vertices ({len(outer_polygon)}), simplifying...")
+                    logger.warning(f"Contour {idx} has too many vertices ({len(outer_polygon)}), simplifying...")
                     # Simplify the polygon
                     epsilon = 0.01 * cv2.arcLength(contour, True)
                     simplified = cv2.approxPolyDP(contour, epsilon, True)
@@ -148,7 +151,7 @@ class STLGenerator:
                     # Limit number of holes to prevent complexity explosion
                     MAX_HOLES = 100
                     if len(holes) > MAX_HOLES:
-                        print(f"Warning: Contour {idx} has too many holes ({len(holes)}), limiting to {MAX_HOLES}")
+                        logger.warning(f"Contour {idx} has too many holes ({len(holes)}), limiting to {MAX_HOLES}")
                         # Sort holes by area and keep largest
                         hole_areas = [Polygon(h).area if len(h) >= 3 else 0 for h in holes]
                         sorted_holes = sorted(zip(hole_areas, holes), reverse=True)
@@ -160,7 +163,7 @@ class STLGenerator:
 
                 # Check if polygon is valid before extruding
                 if not polygon.is_valid:
-                    print(f"Warning: Invalid polygon for contour {idx}, attempting to fix...")
+                    logger.warning(f"Invalid polygon for contour {idx}, attempting to fix...")
                     polygon = polygon.buffer(0)  # Fix self-intersections
                     if not polygon.is_valid:
                         raise ValueError("Polygon cannot be fixed")
@@ -179,7 +182,7 @@ class STLGenerator:
 
             except Exception as e:
                 # If polygon creation fails, fall back to simple extrusion
-                print(f"Warning: Polygon extrusion failed for contour {idx}: {e}")
+                logger.warning(f"Polygon extrusion failed for contour {idx}: {e}")
                 # Create simple mesh without holes as fallback
                 mesh = self._create_simple_extrusion(outer_polygon, thickness_mm, base_height_mm)
                 if mesh is not None:
@@ -309,10 +312,10 @@ class STLGenerator:
             try:
                 combined_mesh.fix_normals()
             except Exception as e:
-                print(f"Warning: Could not fix normals: {e}")
+                logger.warning(f"Could not fix normals: {e}")
                 # Continue anyway - mesh might still be usable
         else:
-            print(f"Warning: Mesh too complex ({len(combined_mesh.faces)} faces), skipping fix_normals()")
+            logger.warning(f"Mesh too complex ({len(combined_mesh.faces)} faces), skipping fix_normals()")
 
         # Export to STL
         combined_mesh.export(output_path)

@@ -27,6 +27,9 @@ from modules.ui_components import (ImagePreviewWidget, ControlPanel,
                                    NoWheelDoubleSpinBox)
 from modules.config import ConfigManager
 from modules.app_state import AppState
+from modules.logger import setup_logger
+
+logger = setup_logger("Main")
 
 
 class ProcessingThread(QThread):
@@ -520,7 +523,7 @@ class MainWindow(QMainWindow):
         """Handle processing error."""
         self.is_processing = False
         self.statusBar().showMessage(f"Processing error: {error_msg}")
-        print(f"Error in processing thread: {error_msg}")
+        logger.error(f"Error in processing thread: {error_msg}")
 
     def generate_svg(self):
         """Generate SVG from processed masks."""
@@ -819,7 +822,7 @@ class STLGeneratorDialog(QDialog):
         """Handle preview generation error."""
         self.is_processing = False
         self.preview_label.setText(f"Preview generation failed:\n{error_msg}")
-        print(f"Preview error: {error_msg}")
+        logger.error(f"Preview error: {error_msg}")
 
     def generate_stl(self):
         """Generate STL file."""

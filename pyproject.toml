@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tracertemplatemaker"
+version = "1.6.1"
+description = "Convert physical tracing templates into digital SVG and 3D-printable STL files"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "Open Source"}
+authors = [
+    {name = "TracerTemplateMaker Contributors"}
+]
+keywords = ["svg", "stl", "tracing", "template", "3d-printing", "opencv", "computer-vision"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: End Users/Desktop",
+    "Topic :: Multimedia :: Graphics :: 3D Modeling",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+    "License :: OSI Approved :: MIT License",
+]
+dependencies = [
+    "opencv-python>=4.8.0",
+    "numpy>=1.24.0",
+    "Pillow>=10.0.0",
+    "svgwrite>=1.4.3",
+    "numpy-stl>=3.0.0",
+    "trimesh>=4.0.0",
+    "shapely>=2.0.0",
+    "mapbox-earcut>=2.0.0",
+    "PyQt6>=6.5.0",
+    "matplotlib>=3.7.0",
+    "scikit-image>=0.21.0",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/katzmatt/TracerTemplateMaker"
+"Bug Tracker" = "https://github.com/katzmatt/TracerTemplateMaker/issues"
+
+[project.scripts]
+tracertemplatemaker = "main:main"
+
+[tool.setuptools]
+py-modules = ["main"]
+packages = ["modules"]

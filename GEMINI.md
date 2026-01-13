@@ -13,7 +13,7 @@ The core value proposition is **dimensional accuracy**, allowing makers to digit
 *   **GUI:** PyQt6
 *   **Image Processing:** OpenCV, Pillow, scikit-image
 *   **Vector/3D Generation:** svgwrite, trimesh, numpy-stl, shapely
-*   **Visualization:** Matplotlib
+*   **Visualization:** Matplotlib (Poly3DCollection for artifact-free previews)
 *   **Packaging:** setuptools, pyproject.toml
 
 ## Architecture
@@ -29,6 +29,7 @@ The project follows a modular architecture:
     *   **`config.py`**: Manages default settings and persistent user configuration.
     *   **`app_state.py`**: Encapsulates the application's runtime state to decouple logic from the UI.
     *   **`logger.py`**: Provides structured logging to console and file.
+*   **`tests/`**: Unit and integration tests.
 
 ## Setup & Development
 
@@ -56,10 +57,11 @@ The project follows a modular architecture:
 *   **Windows Script:** `run.bat`
 
 ### Testing
-*   **Installation Verification:** `python test_installation.py`
-*   **Specific Tests:**
-    *   `python test_stl_edge_cases.py` (Tests STL generation robustness)
-    *   `python test_stl_watertight.py` (Verifies mesh integrity)
+*   **Run All Tests:** `python tests/run_tests.py`
+*   **Test Structure:**
+    *   `tests/test_image_processor.py`: Unit tests for image processing logic.
+    *   `tests/test_svg_generator.py`: Unit tests for SVG creation.
+    *   `tests/test_stl_*.py`: Legacy tests for STL generation and robustness.
 
 ## Development Conventions
 

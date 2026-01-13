@@ -46,7 +46,8 @@ dependencies = [
 
 [project.scripts]
 tracertemplatemaker = "main:main"
+tracertemplatemaker-test = "tests.run_tests:run_tests"
 
 [tool.setuptools]
 py-modules = ["main"]
-packages = ["modules"]
+packages = ["modules", "tests"]

@@ -324,6 +324,7 @@ class ControlPanel(QWidget):
         slider.setValue(default)
         slider.setTickPosition(QSlider.TickPosition.TicksBelow)
         slider.setTickInterval((max_val - min_val) // 10)
+        slider.setMinimumWidth(150)
 
         # Create value label
         value_label = QLabel(str(default))
@@ -340,6 +341,7 @@ class ControlPanel(QWidget):
         layout.addWidget(slider)
         layout.addWidget(value_label)
         group.setLayout(layout)
+        group.setMinimumHeight(60)
 
         # Store slider
         self.sliders[label] = (slider, default)

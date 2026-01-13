@@ -12,9 +12,9 @@ import os
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QHBoxLayout, QPushButton, QFileDialog, QTabWidget,
                              QLabel, QMessageBox, QGroupBox, QDoubleSpinBox,
-                             QCheckBox, QProgressBar, QDialog)
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
-from PyQt6.QtGui import QIcon, QCursor, QMouseEvent
+                             QCheckBox, QProgressBar, QDialog, QScrollArea)
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
+from PyQt6.QtGui import QIcon, QCursor, QMouseEvent, QPixmap
 import cv2
 import numpy as np
 
@@ -66,6 +66,7 @@ class MainWindow(QMainWindow):
         self.profile_mask = None
         self.text_mask = None
         self.svg_path = None
+        self.is_processing = False
 
         # Processing parameters (apply to whole image)
         self.contrast = 1.0
@@ -91,6 +92,12 @@ class MainWindow(QMainWindow):
         # Eyedropper mode
         self.eyedropper_active = False
         self.eyedropper_target = None  # Which color we're picking for
+
+        # Debounce timer for processing
+        self.process_timer = QTimer()
+        self.process_timer.setSingleShot(True)
+        self.process_timer.setInterval(150)  # 150ms delay
+        self.process_timer.timeout.connect(self.start_processing_thread)
 
         self.init_ui()
 
@@ -121,6 +128,13 @@ class MainWindow(QMainWindow):
 
     def create_left_panel(self) -> QWidget:
         """Create left control panel."""
+        # Create a scroll area to hold the controls
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll_area.setMinimumWidth(350)
+
+        # Create the content widget that goes inside the scroll area
         panel = QWidget()
         layout = QVBoxLayout()
 
@@ -169,7 +183,7 @@ class MainWindow(QMainWindow):
         process_layout = QVBoxLayout()
 
         process_btn = QPushButton("Process Image")
-        process_btn.clicked.connect(self.process_image)
+        process_btn.clicked.connect(self.trigger_processing)
         process_layout.addWidget(process_btn)
 
         svg_btn = QPushButton("Generate SVG")
@@ -185,7 +199,9 @@ class MainWindow(QMainWindow):
 
         layout.addStretch()
         panel.setLayout(layout)
-        return panel
+        
+        scroll_area.setWidget(panel)
+        return scroll_area
 
     def create_right_panel(self) -> QWidget:
         """Create right preview panel."""
@@ -249,6 +265,10 @@ class MainWindow(QMainWindow):
         # This is a placeholder - could be enhanced to parse dimensions from filename
         pass
 
+    def trigger_processing(self):
+        """Reset the debounce timer to trigger processing."""
+        self.process_timer.start()
+
     def on_dimensions_changed(self, width_mm: float, height_mm: float):
         """Handle dimension change."""
         self.image_processor.set_dimensions(width_mm, height_mm)
@@ -257,71 +277,67 @@ class MainWindow(QMainWindow):
     def on_contrast_changed(self, value: float):
         """Handle contrast change."""
         self.contrast = value
-        self.update_processed_preview()
-        self.process_image()  # Auto-process on change
+        self.trigger_processing()
 
     def on_brightness_changed(self, value: float):
         """Handle brightness change."""
         self.brightness = value
-        self.update_processed_preview()
-        self.process_image()  # Auto-process on change
+        self.trigger_processing()
 
     def on_sharpness_changed(self, value: float):
         """Handle sharpness change."""
         self.sharpness = value
-        self.update_processed_preview()
-        self.process_image()  # Auto-process on change
+        self.trigger_processing()
 
     def on_blur_changed(self, value: int):
         """Handle blur change."""
         self.blur_kernel = value
-        self.update_processed_preview()
-        self.process_image()  # Auto-process on change
+        self.trigger_processing()
 
     def on_profile_threshold_changed(self, value: int):
         """Handle profile threshold change."""
         self.profile_threshold = value
-        self.process_image()  # Auto-process on change
+        self.trigger_processing()
 
     def on_text_threshold_changed(self, value: int):
         """Handle text threshold change."""
         self.text_threshold = value
-        self.process_image()  # Auto-process on change
+        self.trigger_processing()
 
     def on_profile_tolerance_changed(self, value: int):
         """Handle profile color tolerance change."""
         self.profile_tolerance = value
-        self.process_image()  # Auto-process on change
+        self.trigger_processing()
 
     def on_profile_smoothing_changed(self, value: int):
         """Handle profile smoothing change."""
         self.profile_smoothing = value
-        self.process_image()  # Auto-process on change
+        self.trigger_processing()
 
     def on_text_tolerance_changed(self, value: int):
         """Handle text color tolerance change."""
         self.text_tolerance = value
-        self.process_image()  # Auto-process on change
+        self.trigger_processing()
 
     def on_text_detail_changed(self, value: int):
         """Handle text detail level change."""
         self.text_detail = value
-        self.process_image()  # Auto-process on change
+        self.trigger_processing()
 
     def on_bg_color_changed(self, color: tuple):
         """Handle background/void color change."""
         self.bg_color = color
-        self.process_image()  # Auto-process on color change
+        self.trigger_processing()
 
     def on_tracer_color_changed(self, color: tuple):
         """Handle tracer card color change."""
         self.tracer_color = color
-        self.process_image()  # Auto-process on color change
+        self.trigger_processing()
 
     def on_text_color_changed(self, color: tuple):
         """Handle text/line color change."""
         self.text_color = color
-        self.process_image()  # Auto-process on color change
+        self.trigger_processing()
 
     def activate_eyedropper(self, target: str):
         """
@@ -388,62 +404,100 @@ class MainWindow(QMainWindow):
         # Restore normal mouse handler
         self.original_preview.image_label.mousePressEvent = self.original_preview.mouse_press_event
 
-    def update_processed_preview(self):
-        """Update processed image preview with current settings."""
+    def start_processing_thread(self):
+        """Collect parameters and start the background thread."""
         if self.image_processor.original_image is None:
             return
 
+        # If already processing, the timer will just fire again later
+        # But we can also cancel the previous thread if needed, or just wait
+        # For simplicity, we'll just let it run but indicate we are busy
+        # Ideally, we should cancel the previous thread if it's stale, but QThread doesn't support safe cancellation easily.
+        # So we just fire a new one. The UI will update with the latest result.
+        
+        self.is_processing = True
+        self.statusBar().showMessage("Processing...")
+        
+        # Collect all current parameters
+        params = {
+            'contrast': self.contrast,
+            'brightness': self.brightness,
+            'sharpness': self.sharpness,
+            'blur_kernel': self.blur_kernel,
+            'bg_color': self.bg_color,
+            'tracer_color': self.tracer_color,
+            'text_color': self.text_color,
+            'profile_tolerance': self.profile_tolerance,
+            'profile_threshold': self.profile_threshold,
+            'profile_smoothing': self.profile_smoothing,
+            'text_tolerance': self.text_tolerance,
+            'text_threshold': self.text_threshold,
+            'text_detail': self.text_detail
+        }
+
+        # Create thread
+        self.thread = ProcessingThread(
+            self.run_full_pipeline, 
+            self.image_processor, 
+            **params
+        )
+        self.thread.finished.connect(self.on_processing_finished)
+        self.thread.error.connect(self.on_processing_error)
+        self.thread.start()
+
+    @staticmethod
+    def run_full_pipeline(processor, **kwargs):
+        """
+        Static method to run the full image processing pipeline.
+        This runs in a separate thread.
+        """
+        # 1. Apply image adjustments
+        processed = processor.process_image(
+            contrast=kwargs['contrast'],
+            brightness=kwargs['brightness'],
+            sharpness=kwargs['sharpness'],
+            blur_kernel=kwargs['blur_kernel']
+        )
+        
+        # 2. Separate layers
+        profile_mask, text_mask = processor.separate_layers(
+            processed,
+            kwargs['bg_color'],
+            kwargs['tracer_color'],
+            kwargs['text_color'],
+            profile_tolerance=kwargs['profile_tolerance'],
+            profile_threshold=kwargs['profile_threshold'],
+            profile_smoothing=kwargs['profile_smoothing'],
+            text_tolerance=kwargs['text_tolerance'],
+            text_threshold=kwargs['text_threshold'],
+            text_detail=kwargs['text_detail']
+        )
+        
+        return processed, profile_mask, text_mask
+
+    def on_processing_finished(self, result):
+        """Handle successful processing."""
+        self.is_processing = False
+        processed, profile_mask, text_mask = result
+        
+        self.processed_image = processed
+        self.profile_mask = profile_mask
+        self.text_mask = text_mask
+
+        # Update previews
         try:
-            processed = self.image_processor.process_image(
-                contrast=self.contrast,
-                brightness=self.brightness,
-                sharpness=self.sharpness,
-                blur_kernel=self.blur_kernel
-            )
-            self.processed_image = processed
             self.processed_preview.set_image(processed)
-
-        except Exception as e:
-            self.statusBar().showMessage(f"Error: {str(e)}")
-
-    def process_image(self):
-        """Process image to extract layers."""
-        if self.image_processor.original_image is None:
-            return  # Silently return if no image loaded (for auto-processing)
-
-        try:
-            # Apply adjustments
-            self.update_processed_preview()
-
-            # Separate layers with independent controls for each layer
-            profile_mask, text_mask = self.image_processor.separate_layers(
-                self.processed_image,
-                self.bg_color,       # Background/void color (white)
-                self.tracer_color,   # Tracer card color (yellow)
-                self.text_color,     # Text/line color (black)
-                # Profile layer controls
-                profile_tolerance=self.profile_tolerance,
-                profile_threshold=self.profile_threshold,
-                profile_smoothing=self.profile_smoothing,
-                # Text layer controls
-                text_tolerance=self.text_tolerance,
-                text_threshold=self.text_threshold,
-                text_detail=self.text_detail
-            )
-
-            self.profile_mask = profile_mask
-            self.text_mask = text_mask
-
-            # Display masks
-            # Profile mask: white = holes/voids, black = everything else
-            # Display as-is (no inversion needed with three-color system)
             self.profile_preview.set_image(cv2.cvtColor(profile_mask, cv2.COLOR_GRAY2BGR))
             self.text_preview.set_image(cv2.cvtColor(text_mask, cv2.COLOR_GRAY2BGR))
-
             self.statusBar().showMessage("Image processed - layers separated")
-
         except Exception as e:
-            self.statusBar().showMessage(f"Processing error: {str(e)}")
+            self.on_processing_error(str(e))
+
+    def on_processing_error(self, error_msg):
+        """Handle processing error."""
+        self.is_processing = False
+        self.statusBar().showMessage(f"Processing error: {error_msg}")
+        print(f"Error in processing thread: {error_msg}")
 
     def generate_svg(self):
         """Generate SVG from processed masks."""

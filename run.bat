@@ -1,5 +1,6 @@
 @echo off
 REM Quick start script for TracerTemplateMaker (Windows)
+pushd "%~dp0"
 
 echo TracerTemplateMaker - Quick Start
 echo ==================================
@@ -29,4 +30,5 @@ REM Run the application
 echo Starting TracerTemplateMaker...
 python main.py
 
+popd
 pause

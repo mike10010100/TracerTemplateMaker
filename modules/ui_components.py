@@ -39,6 +39,9 @@ class ImagePreviewWidget(QWidget):
     """
     Widget for displaying images with pan and zoom capabilities.
     """
+    
+    # Signal emitted when view changes (zoom, h_scroll, v_scroll)
+    view_changed = pyqtSignal(float, int, int)
 
     def __init__(self, parent=None):
         """Initialize the image preview widget."""
@@ -78,6 +81,22 @@ class ImagePreviewWidget(QWidget):
         self.image_label.mouseMoveEvent = self.mouse_move_event
         self.image_label.mouseReleaseEvent = self.mouse_release_event
         self.scroll_area.wheelEvent = self.wheel_event
+
+    def set_view(self, zoom: float, h_scroll: int, v_scroll: int):
+        """
+        Set view state programmatically.
+        Does not emit view_changed to prevent loops.
+        """
+        update_needed = False
+        if abs(self.zoom_level - zoom) > 0.001:
+            self.zoom_level = zoom
+            update_needed = True
+        
+        if update_needed:
+            self.update_display()
+            
+        self.scroll_area.horizontalScrollBar().setValue(h_scroll)
+        self.scroll_area.verticalScrollBar().setValue(v_scroll)
 
     def set_image(self, image: np.ndarray):
         """
@@ -142,6 +161,9 @@ class ImagePreviewWidget(QWidget):
             v_bar.setValue(v_bar.value() - delta.y())
 
             self.last_mouse_pos = current_pos
+            
+            # Emit signal
+            self.view_changed.emit(self.zoom_level, h_bar.value(), v_bar.value())
         else:
             # Show open hand cursor when hovering (ready to pan)
             if self.zoom_level > 1.0:
@@ -179,6 +201,11 @@ class ImagePreviewWidget(QWidget):
             self.image_label.setCursor(QCursor(Qt.CursorShape.OpenHandCursor))
         else:
             self.image_label.setCursor(QCursor(Qt.CursorShape.ArrowCursor))
+            
+        # Emit signal
+        h_bar = self.scroll_area.horizontalScrollBar()
+        v_bar = self.scroll_area.verticalScrollBar()
+        self.view_changed.emit(self.zoom_level, h_bar.value(), v_bar.value())
 
     def reset_view(self):
         """Reset zoom and pan to default."""

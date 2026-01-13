@@ -241,24 +241,43 @@ class MainWindow(QMainWindow):
 
         # Original image tab
         self.original_preview = ImagePreviewWidget()
+        self.original_preview.view_changed.connect(self.sync_views)
         self.tab_widget.addTab(self.original_preview, "Original")
 
         # Processed image tab
         self.processed_preview = ImagePreviewWidget()
+        self.processed_preview.view_changed.connect(self.sync_views)
         self.tab_widget.addTab(self.processed_preview, "Processed")
 
         # Profile mask tab
         self.profile_preview = ImagePreviewWidget()
+        self.profile_preview.view_changed.connect(self.sync_views)
         self.tab_widget.addTab(self.profile_preview, "Profile Layer")
 
         # Text mask tab
         self.text_preview = ImagePreviewWidget()
+        self.text_preview.view_changed.connect(self.sync_views)
         self.tab_widget.addTab(self.text_preview, "Text Layer")
 
         layout.addWidget(self.tab_widget)
 
         panel.setLayout(layout)
         return panel
+
+    def sync_views(self, zoom: float, h_scroll: int, v_scroll: int):
+        """Synchronize zoom and pan across all image previews."""
+        sender = self.sender()
+        
+        previews = [
+            self.original_preview,
+            self.processed_preview,
+            self.profile_preview,
+            self.text_preview
+        ]
+        
+        for preview in previews:
+            if preview != sender:
+                preview.set_view(zoom, h_scroll, v_scroll)
 
     def load_image(self):
         """Load image file."""

@@ -140,7 +140,7 @@ class MainWindow(QMainWindow):
             (self.state.text_color[2], self.state.text_color[1], self.state.text_color[0]),
         )
 
-        # Update Sliders (ControlPanel needs a set_values method, we'll add it)
+        # Update Sliders
         self.control_panel.set_values(
             {
                 "Contrast": int(self.state.contrast * 100),
@@ -340,7 +340,7 @@ class MainWindow(QMainWindow):
         Auto-detect dimensions from filename if it contains 'Measure'.
         For example: 'Template_10x5cm_Measure.jpg'
         """
-        # This is a placeholder - could be enhanced to parse dimensions from filename
+        # Placeholder for future implementation of filename-based dimension detection
         pass
 
     def trigger_processing(self):
@@ -436,7 +436,7 @@ class MainWindow(QMainWindow):
         self.original_preview.image_label.setCursor(QCursor(Qt.CursorShape.CrossCursor))
         self.show_status_message(f"Click on the image to pick {target} color")
 
-        # Temporarily connect click handler
+        # Override mouse handler for eyedropper mode
         self.original_preview.image_label.mousePressEvent = self.eyedropper_click
 
     def eyedropper_click(self, event: QMouseEvent):

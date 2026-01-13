@@ -249,25 +249,6 @@ class STLGenerator:
         except Exception:
             return None
 
-    def close_mesh_caps(
-        self, mesh: trimesh.Trimesh, binary_mask: np.ndarray, base_height: float, thickness: float
-    ) -> trimesh.Trimesh:
-        """
-        Verify mesh is watertight (should already be from extrude_polygon).
-
-        Args:
-            mesh: Input mesh
-            binary_mask: Binary mask (not used, kept for compatibility)
-            base_height: Z-height of bottom (not used, kept for compatibility)
-            thickness: Extrusion thickness (not used, kept for compatibility)
-
-        Returns:
-            trimesh.Trimesh: Mesh (already watertight from extrude_polygon)
-        """
-        # The new extrude_polygon method creates watertight meshes automatically
-        # This method is kept for compatibility but no longer needs to do anything
-        return mesh
-
     def create_dual_layer_stl(
         self,
         profile_mask: np.ndarray,

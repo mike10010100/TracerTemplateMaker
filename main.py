@@ -772,25 +772,15 @@ class STLGeneratorDialog(QDialog):
         fig = plt.figure(figsize=(8, 6))
         ax = fig.add_subplot(111, projection='3d')
         
-        # Optimization: Simplify mesh if too large
-        TARGET_FACES = 10000
-        
-        if len(mesh_to_render.faces) > TARGET_FACES:
-            try:
-                # Attempt simplification (requires optional dependencies like fast-simplification or open3d)
-                mesh_to_render = mesh_to_render.simplify_quadric_decimation(TARGET_FACES)
-            except Exception:
-                # Simplification failed (likely missing dependencies)
-                # We will render the full mesh (might be slow, but accurate)
-                pass
-        
         # Render surface
+        # We render the full mesh without simplification to ensure visual fidelity.
+        # Simplification algorithms (like quadric decimation) often destroy the topology
+        # of flat, extruded shapes with holes, causing "webbing" artifacts.
         vertices = mesh_to_render.vertices
         faces = mesh_to_render.faces
         x, y, z = vertices[:, 0], vertices[:, 1], vertices[:, 2]
         
-        # Note: plot_trisurf can be slow for large meshes (>20k faces)
-        # but since we are in a background thread, we prioritize quality over speed.
+        # Note: plot_trisurf can be slow for large meshes but provides the accurate view user requested
         ax.plot_trisurf(x, y, z, triangles=faces, cmap='viridis',
                        alpha=0.8, edgecolor='none', shade=True)
         title = 'STL Preview (Text side on top)'
